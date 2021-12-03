@@ -25,6 +25,9 @@ test-all: clean format unit-test integration-test
 publish-local:
 	sbt publishLocal
 
+build:
+	#sbt run
+
 run:
 	#sbt app/run
 
