@@ -26,16 +26,11 @@ jobs:
       - name: Generate checksums (Release prep)
         run: |
              cd app/target/scala-2.13/
-             sha256sum "alephium-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-${{ steps.get_version.outputs.VERSION }}.jar.checksum"
+             sha256sum "luyu-chain33-${{ steps.get_version.outputs.VERSION }}.jar" > "luyu-chain33-${{ steps.get_version.outputs.VERSION }}.jar.checksum"
              cd ../../../wallet/target/scala-2.13/
-             sha256sum "alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar" > "alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar.checksum"
-             cd ../../../
+
       
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar
-            app/target/scala-2.13/alephium-${{ steps.get_version.outputs.VERSION }}.jar.checksum
-            wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar
-            wallet/target/scala-2.13/alephium-wallet-${{ steps.get_version.outputs.VERSION }}.jar.checksum

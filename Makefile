@@ -1,17 +1,23 @@
+build:
+	@sbt compile
+
+run:
+	sbt run
+
 assembly:
-	#sbt app/assembly wallet/assembly
+	#sbt assembly
 
 package:
-	#sbt app/universal:packageBin
+	@sbt package
 
 docker:
-	#sbt app/docker
+
 
 clean:
-	sbt clean
+	@sbt clean
 
-format:
-	sbt scalafmtSbt scalafmt test:scalafmt scalastyle test:scalastyle it:scalafmt it:scalastyle
+fmt:
+	@sbt scalafmt
 
 unit-test:
 	sbt test
@@ -19,17 +25,8 @@ unit-test:
 integration-test:
 	sbt it:test
 
-test-all: clean format unit-test integration-test
+test-all: clean fmt unit-test integration-test
 	sbt doc
 
-publish-local:
-	sbt publishLocal
-
-build:
-	#sbt run
-
-run:
-	#sbt app/run
-
 benchmark:
-	sbt "benchmark/jmh:run -i 3 -wi 3 -f1 -t1 .*Bench.*"
+

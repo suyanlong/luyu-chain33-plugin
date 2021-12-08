@@ -1,3 +1,13 @@
 target/
 log
 .idea
+
+.settings
+.project
+.classpath
+
+*.iml
+
+.metals
+.bloop
+.bsp
