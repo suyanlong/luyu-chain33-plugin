@@ -12,3 +12,4 @@
 //addSbtPlugin("com.githu.mpeltonen" % "sbt-idea" % "1.2.0")
 addSbtPlugin("org.jetbrains" %% "sbt-idea-plugin" % "3.13.4")
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.3")
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "1.1.0")

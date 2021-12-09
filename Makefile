@@ -1,17 +1,17 @@
 build:
 	@sbt compile
 
+assembly:
+	sbt assembly
+
 run:
 	sbt run
 
-assembly:
-	#sbt assembly
 
 package:
 	@sbt package
 
 docker:
-
 
 clean:
 	@sbt clean
