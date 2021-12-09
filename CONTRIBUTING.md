@@ -1,4 +1,4 @@
-# Contributing to luju-chain33
+# Contributing to luyu-chain33-plugin
 
 As an open source project, everyone is invited to contribute to Luyu-chain33.
 

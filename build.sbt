@@ -3,27 +3,28 @@ import Dependencies._
 ThisBuild / scalaVersion     := "2.12.8"
 ThisBuild / version          := "0.1.0-SNAPSHOT"
 ThisBuild / organization     := "com.chain33"
-ThisBuild / organizationName := "luju-chain33"
+ThisBuild / organizationName := "luyu-chain33"
 
-val AkkaVersion = "2.6.8"
-val AkkaHttpVersion = "10.2.7"
+
+
+resolvers += "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
+resolvers += "Sonatype s01 Releases" at "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+resolvers += "aliyun public Releases"   at "https://maven.aliyun.com/nexus/content/groups/public/"
+resolvers += "aliyun jcenter Releases"   at "https://maven.aliyun.com/nexus/content/repositories/jcenter"
+
+
 
 lazy val root = (project in file("."))
   .settings(
-  // set the name of the project
     name := "luyu-chain33",
-    // set the main Scala source directory to be <base>/src
-//    Compile / scalaSource := baseDirectory.value / "src",
-
-    // set the Scala test source directory to be <base>/test
-//    Test / scalaSource := baseDirectory.value / "test",
-
-    // add a test dependency on ScalaCheck
-//    libraryDependencies += scalacheck % Test,
     libraryDependencies ++= Seq(
       scalaTest % Test,
       utilCore,
       "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion,
       "com.typesafe.akka" %% "akka-stream" % AkkaVersion,
-      "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion
+      "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion,
+
+      "link.luyu" % "luyu-cross-chain-protocol" % "1.0.0",
+      "link.luyu" % "luyu-java-sdk" % "1.0.0",
+      "link.luyu" % "luyu-toolkit" % "1.0.0"
     ))
