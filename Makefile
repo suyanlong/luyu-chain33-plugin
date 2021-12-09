@@ -19,7 +19,7 @@ clean:
 fmt:
 	@sbt scalafmt
 
-unit-test:
+test:
 	sbt test
 
 integration-test:
