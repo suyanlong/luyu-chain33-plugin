@@ -11,3 +11,4 @@ log
 .metals
 .bloop
 .bsp
+.DS_Store
