@@ -2,7 +2,7 @@
 
 # chain33陆羽跨链协议插件
 
-luyu-chain33-Plugin是[chain33](https://github.com/33cn)用于适配[陆羽跨链协议](https://gitee.com/luyu-community/luyu-cross-chain-protocol) 的插件。
+luyu-chain33-plugin是[chain33](https://github.com/33cn)用于适配[陆羽跨链协议](https://gitee.com/luyu-community/luyu-cross-chain-protocol)的插件。
 
 ## 编译插件
 
@@ -25,7 +25,8 @@ make assembly
 ## [chain33社区](https://github.com/33cn/chain33)
 
 
-
+## Q&A
+正在开发中
 
 
 
