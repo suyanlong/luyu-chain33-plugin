@@ -1,18 +1,19 @@
 package com.chain33.driver
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import link.luyu.protocol.link.{Driver => BaseDriver, _}
 import link.luyu.protocol.network.{Account, CallRequest, Events, Transaction}
 
-class Driver extends BaseDriver {
-  override def start(): Unit = ???
+case class Driver(val connection: Connection) extends BaseDriver {
+  override def start(): Unit = {}
 
-  override def stop(): Unit = ???
+  override def stop(): Unit = {}
 
-  override def getType: String = ???
+  override def getType: String = "chain33"
 
   override def listResources(callback: BaseDriver.ResourcesCallback): Unit = ???
 
-  override def registerEvents(events: Events): Unit = ???
+  override def registerEvents(events: Events): Unit = {}
 
   override def call(
       account: Account,
@@ -20,7 +21,7 @@ class Driver extends BaseDriver {
       callback: BaseDriver.CallResponseCallback
   ): Unit = ???
 
-  override def getSignatureType: String = ???
+  override def getSignatureType: String = "SM2_WITH_SM3"
 
   override def getBlockByHash(blockHash: String, callback: BaseDriver.BlockCallback): Unit = ???
 
@@ -36,4 +37,8 @@ class Driver extends BaseDriver {
       request: Transaction,
       callback: BaseDriver.ReceiptCallback
   ): Unit = ???
+}
+
+object Driver {
+  private val objectMapper = new ObjectMapper
 }
