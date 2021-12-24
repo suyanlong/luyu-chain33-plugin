@@ -25,5 +25,9 @@ lazy val root = (project in file("."))
 
       "link.luyu" % "luyu-cross-chain-protocol" % "1.0.0",
       "link.luyu" % "luyu-java-sdk" % "1.0.0",
-      "link.luyu" % "luyu-toolkit" % "1.0.0"
+      "link.luyu" % "luyu-toolkit" % "1.0.0",
+      "com.citahub.cita" % "core" % "20.2.0",
+      "org.apache.commons" % "commons-lang3" % "3.11",
+      "org.apache.commons" % "commons-collections4" % "4.4",
+      "org.reflections" % "reflections" % "0.9.11"
     ))
