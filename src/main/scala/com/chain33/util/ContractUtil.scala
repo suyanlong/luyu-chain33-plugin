@@ -9,66 +9,59 @@ import com.citahub.cita.abi.datatypes.Function
 import com.citahub.cita.abi.datatypes.Type
 import com.citahub.cita.abi.datatypes.Uint
 import com.citahub.cita.abi.datatypes.Utf8String
-import com.citahub.constant.ContractType
-import com.citahub.contract.ContractParam
-import com.google.common.collect.Lists
 import com.google.common.collect.Maps
 
-import java.lang.reflect.Constructor
 import java.math.BigInteger
-import java.util
+import java.util.concurrent.ConcurrentMap
 import org.apache.commons.collections4.CollectionUtils
 import org.apache.commons.lang3.StringUtils
 import org.reflections.Reflections
+import com.chain33.contract._
+import com.chain33.constant._
 
-import java.util.{List, Map, Set}
+import scala.collection.convert.ImplicitConversions.`set asScala`
+import scala.collection.convert.ImplicitConversions.`seq AsJavaList`
 
 object ContractUtil {
   private val LEFT_RIGHT_BRACKETS = "[]"
-  private val CLASS_MAP           = Maps.newConcurrentMap
+//  private val CLASS_MAP:ConcurrentMap[String,Class[_]]           = Maps.newConcurrentMap[String,Class[_]]()
+  private val CLASS_MAP: ConcurrentMap[String, java.lang.Class[_]] = Maps.newConcurrentMap()
 
-  def convertInputParams(params: util.List[ContractParam]): util.List[Type[_]] = {
-    if (CollectionUtils.isEmpty(params)) return Lists.newArrayList
-    val inputs = Lists.newArrayListWithCapacity(params.size)
-    import scala.collection.JavaConversions._
-    for (param <- params) {
-      if (StringUtils.isBlank(param.getType) || StringUtils.isBlank(param.getValue))
-        continue // todo: continue is not supported
-      val `type` = convert(param)
-      if (null == `type`) throw new RuntimeException("")
-      inputs.add(`type`)
-    }
+  def convertInputParams(params: List[ContractParam]): List[Type[_]] = {
+    val inputs = List.empty
+    params
+      .filter(param => !(StringUtils.isBlank(param.`type`) || StringUtils.isBlank(param.value)))
+      .foreach(value => inputs :+ convert(value))
     inputs
   }
 
   private def convert(param: ContractParam): Type[_] = {
-    val `type` = param.getType
-    val value  = param.getValue
-    if (ContractType.BOOL.equalsIgnoreCase(`type`)) return new Bool(Boolean.parseBoolean(value))
+    val `type` = param.`type`
+    val value  = param.value
+    if (ContractType.BOOL.equalsIgnoreCase(`type`)) return new Bool(Boolean.unbox(value))
     else if (`type`.contains(ContractType.UINT) && !`type`.contains(LEFT_RIGHT_BRACKETS))
-      return reflectUintWithValue(param.getType, param.getValue)
+      return reflectUintWithValue(param.`type`, param.value)
     else if (`type`.contains(ContractType.BYTES) && !`type`.contains(LEFT_RIGHT_BRACKETS))
-      return reflectBytesWithValue(param.getType, param.getValue)
+      return reflectBytesWithValue(param.`type`, param.value)
     else if (ContractType.ADDRESS.equalsIgnoreCase(`type`)) return new Address(value)
     else if (ContractType.STRING.equalsIgnoreCase(`type`)) return new Utf8String(value)
+
     val array = value.split(",")
     if (`type`.contains(ContractType.UINT) && `type`.contains(LEFT_RIGHT_BRACKETS)) {
-      val list = Lists.newArrayListWithCapacity(array.length)
-      for (inner <- array) {
-        list.add(reflectUintWithValue(`type`.substring(0, `type`.length - 2), inner))
-      }
+      val list = List.empty
+      array.foreach(value =>
+        list :+ reflectUintWithValue(`type`.substring(0, `type`.length - 2), value)
+      )
       return new DynamicArray[Uint](list)
     } else if (`type`.contains(ContractType.BYTES) && `type`.contains(LEFT_RIGHT_BRACKETS)) {
-      val list = Lists.newArrayListWithCapacity(array.length)
-      for (inner <- array) {
-        list.add(reflectBytesWithValue(`type`.substring(0, `type`.length - 2), inner))
-      }
+      val list = List.empty
+      array.foreach(value =>
+        list :+ (reflectBytesWithValue(`type`.substring(0, `type`.length - 2), value))
+      )
       return new DynamicArray[Bytes](list)
     } else if (ContractType.ADDRESS_ARRAY.equalsIgnoreCase(`type`)) {
-      val list = Lists.newArrayListWithCapacity(array.length)
-      for (inner <- array) {
-        list.add(new Address(inner))
-      }
+      val list = List.empty
+      array.foreach(inner => list :+ (new Address(inner)))
       return new DynamicArray[Address](list)
     }
     null
@@ -76,78 +69,76 @@ object ContractUtil {
 
   def convertFunction(
       methodName: String,
-      params: util.List[ContractParam],
-      out: util.List[String]
+      params: List[ContractParam],
+      out: List[String]
   ): Function = {
     val inputs = convertInputParams(params)
-    if (CollectionUtils.isEmpty(out)) return new Function(methodName, inputs, Lists.newArrayList)
-    val output = Lists.newArrayListWithCapacity(out.size)
-    import scala.collection.JavaConversions._
-    for (string <- out) {
-      if (string.contains(ContractType.UINT) && !string.contains(LEFT_RIGHT_BRACKETS))
-        output.add(TypeReference.create(reflectUint(string)))
-      else if (ContractType.BOOL.equalsIgnoreCase(string)) output.add(new TypeReference[Bool]() {})
-      else if (ContractType.ADDRESS.equalsIgnoreCase(string))
-        output.add(new TypeReference[Address]() {})
-      else if (ContractType.STRING.equalsIgnoreCase(string))
-        output.add(new TypeReference[Utf8String]() {})
-      else if (string.contains(ContractType.BYTES) && !string.contains(LEFT_RIGHT_BRACKETS))
-        output.add(TypeReference.create(reflectBytes(string)))
-      else if (string.contains(ContractType.UINT) && string.contains(LEFT_RIGHT_BRACKETS))
-        output.add(ClassTransferUtil.transfer(string.substring(0, string.length - 2)))
-      else if (string.contains(ContractType.BYTES) && string.contains(LEFT_RIGHT_BRACKETS))
-        output.add(ClassTransferUtil.transfer(string.substring(0, string.length - 2)))
-      else if (ContractType.ADDRESS_ARRAY.equalsIgnoreCase(string))
-        output.add(new TypeReference[DynamicArray[Address]]() {})
+    if (CollectionUtils.isEmpty(out)) {
+      new Function(methodName, inputs, List[TypeReference[_]]())
+    } else {
+      var output: List[TypeReference[_]] = List.empty
+      out.foreach(str => {
+        if (str.contains(ContractType.UINT) && !str.contains(LEFT_RIGHT_BRACKETS))
+          output = output :+ (new TypeReference[Uint]() {
+            override def getType: java.lang.reflect.Type = reflectUint(str)
+          })
+        else if (ContractType.BOOL.equalsIgnoreCase(str))
+          output = output :+ (new TypeReference[Bool]() {})
+        else if (ContractType.ADDRESS.equalsIgnoreCase(str))
+          output = output :+ (new TypeReference[Address]() {})
+        else if (ContractType.STRING.equalsIgnoreCase(str))
+          output = output :+ (new TypeReference[Utf8String]() {})
+        else if (str.contains(ContractType.BYTES) && !str.contains(LEFT_RIGHT_BRACKETS))
+          output = output :+ (new TypeReference[Bytes]() {
+            override def getType: java.lang.reflect.Type = reflectBytes(str)
+          })
+        else if (str.contains(ContractType.UINT) && str.contains(LEFT_RIGHT_BRACKETS))
+          output = output :+ (ClassTransferUtil.transfer(str.substring(0, str.length - 2)))
+        else if (str.contains(ContractType.BYTES) && str.contains(LEFT_RIGHT_BRACKETS))
+          output = output :+ (ClassTransferUtil.transfer(str.substring(0, str.length - 2)))
+        else if (ContractType.ADDRESS_ARRAY.equalsIgnoreCase(str))
+          output = output :+ (new TypeReference[DynamicArray[Address]]() {})
+      })
+      new Function(methodName, inputs, output)
     }
-    new Function(methodName, inputs, output)
   }
 
   private def reflectUintWithValue(name: String, value: String): Uint = {
-    import scala.collection.JavaConversions._
-    for (clazz <- reflectUintChildren) {
-      if (clazz.getSimpleName.equalsIgnoreCase(name)) try {
+    reflectUintChildren
+      .find(clazz => clazz.getSimpleName.equalsIgnoreCase(name))
+      .map(clazz => {
         CLASS_MAP.put(name, clazz)
-        val constructor = clazz.getConstructor(classOf[BigInteger])
-        return constructor.newInstance(new BigInteger(value))
-      } catch {
-        case e: Exception =>
-          throw new RuntimeException("get class constructor failed")
-      }
-    }
-    throw new RuntimeException("can't find class match")
+        clazz.getConstructor(classOf[BigInteger]).newInstance(new BigInteger(value))
+      })
+      .orNull
   }
 
   private def reflectUint(name: String): Class[_] = {
-    val cache = CLASS_MAP.get(name)
-    if (null != cache) return cache
-    import scala.collection.JavaConversions._
-    for (clazz <- reflectUintChildren) {
-      if (clazz.getSimpleName.equalsIgnoreCase(name)) try {
-        CLASS_MAP.put(name, clazz)
-        return clazz
-      } catch {
-        case e: Exception =>
-          throw new RuntimeException("get class constructor failed")
-      }
+    if (CLASS_MAP.containsKey(name)) {
+      CLASS_MAP.get(name)
+    } else {
+      reflectUintChildren
+        .find(clazz => clazz.getSimpleName.equalsIgnoreCase(name))
+        .map(clazz => {
+          CLASS_MAP.put(name, clazz)
+          clazz
+        })
+        .orNull
     }
-    throw new RuntimeException("reflect uint failed")
   }
 
   private def reflectBytes(name: String): Class[_] = {
-    val cache = CLASS_MAP.get(name)
-    if (null != cache) return cache
-    import scala.collection.JavaConversions._
-    for (clazz <- reflectBytesChildren) {
-      if (clazz.getSimpleName.equalsIgnoreCase(name)) try {
-        CLASS_MAP.put(name, clazz)
-        return clazz
-      } catch {
-        case e: Exception =>
-          throw new RuntimeException("get class constructor failed")
-      }
+    if (CLASS_MAP.containsKey(name)) {
+      CLASS_MAP.get(name)
+    } else {
+      reflectBytesChildren
+        .find(clazz => clazz.getSimpleName.equalsIgnoreCase(name))
+        .map(clazz => {
+          CLASS_MAP.put(name, clazz)
+          clazz
+        })
+        .orNull
     }
-    throw new RuntimeException("reflect bytes failed")
   }
 
   private def reflectUintChildren = {
@@ -168,17 +159,8 @@ object ContractUtil {
     reflections.getSubTypesOf(classOf[Bytes])
   }
 
-  private def reflectBytesWithValue(name: String, value: String): Bytes = {
-    import scala.collection.JavaConversions._
-    for (clazz <- reflectBytesChildren) {
-      if (clazz.getSimpleName.equalsIgnoreCase(name)) try {
-        val constructor = clazz.getConstructor(classOf[Array[Byte]])
-        return constructor.newInstance(value.getBytes)
-      } catch {
-        case e: Exception =>
-          throw new RuntimeException("")
-      }
-    }
-    null
-  }
+  private def reflectBytesWithValue(name: String, value: String): Bytes = reflectBytesChildren
+    .find(clazz => clazz.getSimpleName.equalsIgnoreCase(name))
+    .map(clazz => clazz.getConstructor(classOf[Array[Byte]]).newInstance(value.getBytes()))
+    .orNull
 }
