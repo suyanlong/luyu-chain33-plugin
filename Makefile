@@ -19,6 +19,9 @@ clean:
 fmt:
 	@sbt scalafmt
 
+check:
+	@sbt scalafmtCheck
+
 test:
 	sbt test
 

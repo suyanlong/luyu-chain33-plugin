@@ -5,14 +5,21 @@ after_script:
   - make clean
 
 stages:
+  - check
   - build
   - test
+
+check:
+  stage: check
+  script:
+    - make check
 
 build:
   stage: build
   script:
-    - make check
-    - make
+    - make build
+    - make package
+    - make assembly
 
 test:
   stage: test

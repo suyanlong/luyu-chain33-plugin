@@ -1,4 +1,4 @@
-{ "branches": ["master", "next"], 
+{ "branches": ["master", "next"],
   "plugins": [
       [
         "@semantic-release/commit-analyzer",
@@ -13,27 +13,6 @@
         }
       ],
       [
-        "@google/semantic-release-replace-plugin",
-        {
-          "replacements": [
-            {
-              "files": ["version/version.go"],
-              "from": "Version.*",
-              "to": 'Version   = "${nextRelease.version}"',
-              "results": [
-                {
-                  "file": "version/version.go",
-                  "hasChanged": true,
-                  "numMatches": 1,
-                  "numReplacements": 1
-                }
-              ],
-              "countMatches": true
-            }
-          ]
-        }
-      ],
-      [
         "@semantic-release/changelog",
         { "changelogFile": "CHANGELOG.md", "changelogTitle": "changelog" },
       ],
@@ -43,7 +22,7 @@
           "@semantic-release/github",
           {"assets": ["bin/*.gz","bin/*.zip"]}
       ],
-      [ 
+      [
         "@semantic-release/git",
         {
           "assets": ["CHANGELOG.md"],
@@ -51,8 +30,8 @@
       ],
       [
         "@semantic-release/exec", {
-          "prepareCmd": "make releases VERSION=${nextRelease.version}"
+          "prepareCmd": "make assembly"
         }
       ],
-  ] 
+  ]
 }
