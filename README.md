@@ -13,6 +13,11 @@ luyu-chain33-plugin是[chain33](https://github.com/33cn)用于适配[陆羽跨�
 - sbt 1.5.5及以上
 
 **编译命令**:
+```shell
+make build
+```
+
+**打包命令**:
 
 ```shell
 make assembly
