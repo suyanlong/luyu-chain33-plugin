@@ -23,9 +23,58 @@ import scala.collection.convert.ImplicitConversions.`set asScala`
 import scala.collection.convert.ImplicitConversions.`seq AsJavaList`
 
 object ContractUtil {
-  private val LEFT_RIGHT_BRACKETS = "[]"
-//  private val CLASS_MAP:ConcurrentMap[String,Class[_]]           = Maps.newConcurrentMap[String,Class[_]]()
+  private val LEFT_RIGHT_BRACKETS                                  = "[]"
   private val CLASS_MAP: ConcurrentMap[String, java.lang.Class[_]] = Maps.newConcurrentMap()
+
+  private val typeVec = Array {
+    (
+      (param: ContractParam) => ContractType.BOOL.equalsIgnoreCase(param.`type`),
+      (param: ContractParam) => new Bool(Boolean.unbox(param.value))
+    )
+    (
+      (param: ContractParam) => param.`type`.contains(ContractType.UINT) && !param.`type`.contains(LEFT_RIGHT_BRACKETS),
+      (param: ContractParam) => reflectUintWithValue(param.`type`, param.value)
+    )
+    (
+      (param: ContractParam) => param.`type`.contains(ContractType.BYTES) && !param.`type`.contains(LEFT_RIGHT_BRACKETS),
+      (param: ContractParam) => reflectBytesWithValue(param.`type`, param.value)
+    )
+    (
+      (param: ContractParam) => ContractType.ADDRESS.equalsIgnoreCase(param.`type`),
+      (param: ContractParam) => new Address(param.value)
+    )
+    (
+      (param: ContractParam) => ContractType.STRING.equalsIgnoreCase(param.`type`),
+      (param: ContractParam) => new Utf8String(param.value)
+    )
+    (
+      (param: ContractParam) => param.`type`.contains(ContractType.UINT) && param.`type`.contains(LEFT_RIGHT_BRACKETS),
+      (param: ContractParam) => {
+        val list  = List.empty
+        val array = param.value.split(",")
+        array.foreach(value => list :+ reflectUintWithValue(param.`type`.substring(0, param.`type`.length - 2), value))
+        new DynamicArray[Uint](list)
+      }
+    )
+    (
+      (param: ContractParam) => param.`type`.contains(ContractType.BYTES) && param.`type`.contains(LEFT_RIGHT_BRACKETS),
+      (param: ContractParam) => {
+        val array = param.value.split(",")
+        val list  = List.empty
+        array.foreach(value => list :+ (reflectBytesWithValue(param.`type`.substring(0, param.`type`.length - 2), value)))
+        new DynamicArray[Bytes](list)
+      }
+    )
+    (
+      (param: ContractParam) => ContractType.ADDRESS_ARRAY.equalsIgnoreCase(param.`type`),
+      (param: ContractParam) => {
+        val list  = List.empty
+        val array = param.value.split(",")
+        array.foreach(inner => list :+ (new Address(inner)))
+        new DynamicArray[Address](list)
+      }
+    )
+  }
 
   def convertInputParams(params: List[ContractParam]): List[Type[_]] = {
     val inputs = List.empty
@@ -35,37 +84,7 @@ object ContractUtil {
     inputs
   }
 
-  private def convert(param: ContractParam): Type[_] = {
-    val `type` = param.`type`
-    val value  = param.value
-    if (ContractType.BOOL.equalsIgnoreCase(`type`)) return new Bool(Boolean.unbox(value))
-    else if (`type`.contains(ContractType.UINT) && !`type`.contains(LEFT_RIGHT_BRACKETS))
-      return reflectUintWithValue(param.`type`, param.value)
-    else if (`type`.contains(ContractType.BYTES) && !`type`.contains(LEFT_RIGHT_BRACKETS))
-      return reflectBytesWithValue(param.`type`, param.value)
-    else if (ContractType.ADDRESS.equalsIgnoreCase(`type`)) return new Address(value)
-    else if (ContractType.STRING.equalsIgnoreCase(`type`)) return new Utf8String(value)
-
-    val array = value.split(",")
-    if (`type`.contains(ContractType.UINT) && `type`.contains(LEFT_RIGHT_BRACKETS)) {
-      val list = List.empty
-      array.foreach(value =>
-        list :+ reflectUintWithValue(`type`.substring(0, `type`.length - 2), value)
-      )
-      return new DynamicArray[Uint](list)
-    } else if (`type`.contains(ContractType.BYTES) && `type`.contains(LEFT_RIGHT_BRACKETS)) {
-      val list = List.empty
-      array.foreach(value =>
-        list :+ (reflectBytesWithValue(`type`.substring(0, `type`.length - 2), value))
-      )
-      return new DynamicArray[Bytes](list)
-    } else if (ContractType.ADDRESS_ARRAY.equalsIgnoreCase(`type`)) {
-      val list = List.empty
-      array.foreach(inner => list :+ (new Address(inner)))
-      return new DynamicArray[Address](list)
-    }
-    null
-  }
+  private def convert(param: ContractParam): Type[_] = typeVec.find(_._1(param)).map(_._2(param)).orNull
 
   def convertFunction(
       methodName: String,
@@ -78,26 +97,21 @@ object ContractUtil {
     } else {
       var output: List[TypeReference[_]] = List.empty
       out.foreach(str => {
-        if (str.contains(ContractType.UINT) && !str.contains(LEFT_RIGHT_BRACKETS))
-          output = output :+ (new TypeReference[Uint]() {
-            override def getType: java.lang.reflect.Type = reflectUint(str)
-          })
-        else if (ContractType.BOOL.equalsIgnoreCase(str))
-          output = output :+ (new TypeReference[Bool]() {})
-        else if (ContractType.ADDRESS.equalsIgnoreCase(str))
-          output = output :+ (new TypeReference[Address]() {})
-        else if (ContractType.STRING.equalsIgnoreCase(str))
-          output = output :+ (new TypeReference[Utf8String]() {})
-        else if (str.contains(ContractType.BYTES) && !str.contains(LEFT_RIGHT_BRACKETS))
-          output = output :+ (new TypeReference[Bytes]() {
-            override def getType: java.lang.reflect.Type = reflectBytes(str)
-          })
-        else if (str.contains(ContractType.UINT) && str.contains(LEFT_RIGHT_BRACKETS))
-          output = output :+ (ClassTransferUtil.transfer(str.substring(0, str.length - 2)))
-        else if (str.contains(ContractType.BYTES) && str.contains(LEFT_RIGHT_BRACKETS))
-          output = output :+ (ClassTransferUtil.transfer(str.substring(0, str.length - 2)))
-        else if (ContractType.ADDRESS_ARRAY.equalsIgnoreCase(str))
-          output = output :+ (new TypeReference[DynamicArray[Address]]() {})
+        output = output :+ {
+          if (str.contains(ContractType.UINT) && !str.contains(LEFT_RIGHT_BRACKETS))
+            (new TypeReference[Uint]() { override def getType: java.lang.reflect.Type = reflectUint(str) })
+          else if (ContractType.BOOL.equalsIgnoreCase(str)) (new TypeReference[Bool]() {})
+          else if (ContractType.ADDRESS.equalsIgnoreCase(str)) (new TypeReference[Address]() {})
+          else if (ContractType.STRING.equalsIgnoreCase(str)) (new TypeReference[Utf8String]() {})
+          else if (str.contains(ContractType.BYTES) && !str.contains(LEFT_RIGHT_BRACKETS))
+            (new TypeReference[Bytes]() { override def getType: java.lang.reflect.Type = reflectBytes(str) })
+          else if (str.contains(ContractType.UINT) && str.contains(LEFT_RIGHT_BRACKETS))(ClassTransferUtil.transfer(str.substring(0, str.length - 2)))
+          else if (str.contains(ContractType.BYTES) && str.contains(LEFT_RIGHT_BRACKETS))(ClassTransferUtil.transfer(
+            str.substring(0, str.length - 2)
+          ))
+          else if (ContractType.ADDRESS_ARRAY.equalsIgnoreCase(str)) (new TypeReference[DynamicArray[Address]]() {})
+          else null
+        }
       })
       new Function(methodName, inputs, output)
     }
@@ -105,7 +119,7 @@ object ContractUtil {
 
   private def reflectUintWithValue(name: String, value: String): Uint = {
     reflectUintChildren
-      .find(clazz => clazz.getSimpleName.equalsIgnoreCase(name))
+      .find(_.getSimpleName.equalsIgnoreCase(name))
       .map(clazz => {
         CLASS_MAP.put(name, clazz)
         clazz.getConstructor(classOf[BigInteger]).newInstance(new BigInteger(value))
@@ -118,7 +132,7 @@ object ContractUtil {
       CLASS_MAP.get(name)
     } else {
       reflectUintChildren
-        .find(clazz => clazz.getSimpleName.equalsIgnoreCase(name))
+        .find(_.getSimpleName.equalsIgnoreCase(name))
         .map(clazz => {
           CLASS_MAP.put(name, clazz)
           clazz
@@ -132,7 +146,7 @@ object ContractUtil {
       CLASS_MAP.get(name)
     } else {
       reflectBytesChildren
-        .find(clazz => clazz.getSimpleName.equalsIgnoreCase(name))
+        .find(_.getSimpleName.equalsIgnoreCase(name))
         .map(clazz => {
           CLASS_MAP.put(name, clazz)
           clazz
@@ -160,7 +174,7 @@ object ContractUtil {
   }
 
   private def reflectBytesWithValue(name: String, value: String): Bytes = reflectBytesChildren
-    .find(clazz => clazz.getSimpleName.equalsIgnoreCase(name))
-    .map(clazz => clazz.getConstructor(classOf[Array[Byte]]).newInstance(value.getBytes()))
+    .find(_.getSimpleName.equalsIgnoreCase(name))
+    .map(_.getConstructor(classOf[Array[Byte]]).newInstance(value.getBytes()))
     .orNull
 }
