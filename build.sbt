@@ -50,6 +50,7 @@ assemblyMergeStrategy in assembly := {
 }
 
 lazy val root = (project in file("."))
+//  .dependsOn(Projects.depProject)
   .settings(
     name := "luyu-chain33",
     libraryDependencies ++= Seq(
