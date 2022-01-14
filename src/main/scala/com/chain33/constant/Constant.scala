@@ -9,6 +9,7 @@ object Constant {
     val GET_BLOCK_NUMBER        = 105
     val GET_BLOCK_BY_HASH       = 106
     val GET_BLOCK_BY_NUMBER     = 107
+    val GET_TRANSACTION         = 108
   }
 
   object Result {

@@ -1,12 +1,15 @@
 package com.chain33.connection
 
+import link.luyu.protocol.common.STATUS
 import link.luyu.protocol.link
 import cn.chain33.javasdk.client._
-
 import com.chain33.constant.Constant._
+import com.chain33.util._
+
+import java.nio.charset.StandardCharsets
 
 class Connection(val url: String) extends link.Connection {
-  private var client = new RpcClient(url)
+  private val client = new RpcClient(url)
   client.setUrl(url)
 
   override def start(): Unit = {}
@@ -18,7 +21,35 @@ class Connection(val url: String) extends link.Connection {
       `type`: Int,
       data: Array[Byte],
       callback: link.Connection.Callback
-  ): Unit = ???
+  ): Unit = {
+    `type` match {
+      case Type.SEND_TRANSACTION =>
+
+      case Type.CALL_TRANSACTION =>
+
+      case Type.GET_TRANSACTION_RECEIPT =>
+        val txHash  = data.toString
+        val receipt = client.queryTransaction(txHash) // TODO
+        callback.onResponse(Result.SUCCESS, "Success", Utils.toByteArray(receipt))
+
+      case Type.GET_ABI =>
+        val abi = client.queryEVMABIInfo(path, "storage").toString
+        callback.onResponse(Result.SUCCESS, "Success", abi.getBytes(StandardCharsets.UTF_8))
+      case Type.GET_BLOCK_NUMBER =>
+        callback.onResponse(Result.SUCCESS, "Success", Utils.longToBytes(client.getLastHeader.getHeight))
+      case Type.GET_BLOCK_BY_HASH =>
+        val blockHash = path // TODO
+        val appBlock  = client.getBlockByHashes(Array { blockHash }, true).get(0)
+        val blk       = new InternalBlock(appBlock)
+        callback.onResponse(STATUS.OK, "Success", Utils.toByteArray(blk))
+      case Type.GET_BLOCK_BY_NUMBER =>
+        val blockNumber = Utils.bytesToLong(data)
+        val blk         = client.getBlocks(blockNumber, blockNumber, true).get(0)
+        callback.onResponse(STATUS.OK, "Success", Utils.toByteArray(new InternalBlock(blk.getBlock)))
+      case _ => callback.onResponse(Result.ERROR, "Unrecognized type of " + `type`, null)
+
+    }
+  }
 
   override def subscribe(
       `type`: Int,

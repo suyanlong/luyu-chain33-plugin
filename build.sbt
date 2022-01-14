@@ -65,5 +65,6 @@ lazy val root = (project in file("."))
       "com.citahub.cita" % "core" % "20.2.0",
       "org.apache.commons" % "commons-lang3" % "3.11",
       "org.apache.commons" % "commons-collections4" % "4.4",
-      "org.reflections" % "reflections" % "0.9.11"
+      "org.reflections" % "reflections" % "0.9.11",
+      "com.alibaba" % "fastjson" % "1.2.47"
     ))
