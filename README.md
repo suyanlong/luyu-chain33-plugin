@@ -27,6 +27,16 @@ make assembly
 
 该插件要配合[陆羽协议路由](https://gitee.com/luyu-community/router)一起使用。
 
+
+#### 启动链
+
+
+#### 路由配置
+路由需要配置文件提供一些链的信息。
+
+
+#### 停止链
+
 ## [chain33社区](https://github.com/33cn/chain33)
 
 
