@@ -39,6 +39,20 @@ make assembly
 
 ## [chain33社区](https://github.com/33cn/chain33)
 
+## 目录结构
+
+```shell
+├── lib                 #外部依赖苦
+├── project
+│   ├── project   #项目依赖、插件等管理文件
+├── scripts             #常用脚步文件
+├── src                 #源码目录
+│   ├── main      #主要文件目录
+│   ├── resources #配置文件目录
+│   └── test      #测试文件目录
+
+
+```
 
 ## Q&A
 正在开发中
