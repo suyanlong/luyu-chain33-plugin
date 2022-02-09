@@ -6,6 +6,7 @@ import com.citahub.cita.abi.datatypes.DynamicArray
 import com.citahub.cita.abi.datatypes.Uint
 import com.citahub.cita.abi.datatypes.generated._
 
+// format: off
 object ClassTransferUtil {
 
   val typeMap = Map {

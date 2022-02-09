@@ -22,31 +22,17 @@ import com.chain33.constant._
 import scala.collection.convert.ImplicitConversions.`set asScala`
 import scala.collection.convert.ImplicitConversions.`seq AsJavaList`
 
+// format: off
 object ContractUtil {
   private val LEFT_RIGHT_BRACKETS                                  = "[]"
   private val CLASS_MAP: ConcurrentMap[String, java.lang.Class[_]] = Maps.newConcurrentMap()
 
   private val typeVec = Array {
-    (
-      (param: ContractParam) => ContractType.BOOL.equalsIgnoreCase(param.`type`),
-      (param: ContractParam) => new Bool(Boolean.unbox(param.value))
-    )
-    (
-      (param: ContractParam) => param.`type`.contains(ContractType.UINT) && !param.`type`.contains(LEFT_RIGHT_BRACKETS),
-      (param: ContractParam) => reflectUintWithValue(param.`type`, param.value)
-    )
-    (
-      (param: ContractParam) => param.`type`.contains(ContractType.BYTES) && !param.`type`.contains(LEFT_RIGHT_BRACKETS),
-      (param: ContractParam) => reflectBytesWithValue(param.`type`, param.value)
-    )
-    (
-      (param: ContractParam) => ContractType.ADDRESS.equalsIgnoreCase(param.`type`),
-      (param: ContractParam) => new Address(param.value)
-    )
-    (
-      (param: ContractParam) => ContractType.STRING.equalsIgnoreCase(param.`type`),
-      (param: ContractParam) => new Utf8String(param.value)
-    )
+    ((param: ContractParam) => ContractType.BOOL.equalsIgnoreCase(param.`type`), (param: ContractParam) => new Bool(Boolean.unbox(param.value)))
+    ((param: ContractParam) => param.`type`.contains(ContractType.UINT) && !param.`type`.contains(LEFT_RIGHT_BRACKETS), (param: ContractParam) => reflectUintWithValue(param.`type`, param.value))
+    ((param: ContractParam) => param.`type`.contains(ContractType.BYTES) && !param.`type`.contains(LEFT_RIGHT_BRACKETS), (param: ContractParam) => reflectBytesWithValue(param.`type`, param.value))
+    ((param: ContractParam) => ContractType.ADDRESS.equalsIgnoreCase(param.`type`), (param: ContractParam) => new Address(param.value))
+    ((param: ContractParam) => ContractType.STRING.equalsIgnoreCase(param.`type`), (param: ContractParam) => new Utf8String(param.value))
     (
       (param: ContractParam) => param.`type`.contains(ContractType.UINT) && param.`type`.contains(LEFT_RIGHT_BRACKETS),
       (param: ContractParam) => {
