@@ -9,13 +9,18 @@ import link.luyu.protocol.algorithm.ecdsa.secp256k1.SignatureData
 import link.luyu.protocol.algorithm.sm2.SM2WithSM3
 import link.luyu.protocol.common.STATUS
 import link.luyu.protocol.link.{Driver => BaseDriver, _}
-import link.luyu.protocol.network.{Account, CallRequest, Events, Receipt, Resource, Transaction}
+import link.luyu.protocol.network.{Account, CallRequest, CallResponse, Events, Receipt, Resource, Transaction}
+import link.luyu.toolkit.abi.ContractABI
+
 import com.citahub.cita.abi.FunctionEncoder
-import com.citahub.cita.utils.HexUtil
-import com.citahub.cita.crypto.sm2.SM2
+import com.citahub.cita.utils.{HexUtil, Numeric}
+import com.citahub.cita.crypto.sm2.{SM2, SM2Keys}
 import com.chain33.util._
 import com.chain33.constant.Constant._
+import com.chain33.contract.ContractCall
 import cn.chain33.javasdk.model.rpcresult.QueryTransactionResult
+
+import java.math.BigInteger
 
 case class Driver(val connection: Connection) extends BaseDriver {
   override def start(): Unit = {}
@@ -91,7 +96,7 @@ case class Driver(val connection: Connection) extends BaseDriver {
       null,
       Type.GET_TRANSACTION_RECEIPT,
       txHash.getBytes,
-      (errorCode: Int, message: String, responseData: Array[Byte]) => {
+      (_, _, responseData: Array[Byte]) => {
         Driver.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
 //          val transactionReceipt = Driver.objectMapper.readValue(responseData, classOf[TransactionReceipt])
         val transactionReceipt = Driver.objectMapper.readValue(responseData, classOf[QueryTransactionResult])
@@ -193,9 +198,50 @@ case class Driver(val connection: Connection) extends BaseDriver {
 
   override def call(
       account: Account,
-      request: CallRequest,
+      callRequest: CallRequest,
       callback: BaseDriver.CallResponseCallback
-  ): Unit = ???
+  ): Unit = {
+    val contract = Utils.getResourceName(callRequest.getPath)
+    connection.asyncSend(
+      contract,
+      Type.GET_ABI,
+      null,
+      (errorCode: Int, msg: String, responseData: Array[Byte]) => {
+        if (errorCode != STATUS.OK) callback.onResponse(errorCode, msg, null)
+        else {
+          val raw_abi = new String(responseData, StandardCharsets.UTF_8)
+          val abi     = Utils.hexStr2Str(Utils.hexRemove0x(raw_abi))
+          val ctAbi   = new ContractABI(abi)
+          // TODO
+          val funAbi   = ctAbi.getFunctions(callRequest.getMethod).get(0)
+          val function = Utils.convertFunction(abi, callRequest.getMethod, callRequest.getArgs)
+          val call     = new ContractCall(contract, FunctionEncoder.encode(function))
+          val pubKey   = account.getPubKey
+          val sender   = SM2Keys.getAddress(Numeric.toHexStringWithPrefixZeroPadded(new BigInteger(1, pubKey), 128))
+          call.sender_=("0x" + sender)
+          val data = Driver.objectMapper.writeValueAsBytes(call)
+          connection.asyncSend(
+            callRequest.getPath,
+            Type.CALL_TRANSACTION,
+            data,
+            (_, _, responseData1: Array[Byte]) => {
+              val callResponse = new CallResponse
+              if (responseData1 != null) {
+                val resp = new String(responseData1)
+                if (!(resp == "0x")) callResponse.setResult(funAbi.decodeOutput(resp))
+              }
+              callResponse.setCode(0) // original receipt status
+              callResponse.setMessage("Success")
+              callResponse.setMethod(callRequest.getMethod)
+              callResponse.setArgs(callRequest.getArgs)
+              callResponse.setPath(callRequest.getPath)
+              callback.onResponse(STATUS.OK, "Success", callResponse)
+            }
+          )
+        }
+      }
+    )
+  }
 }
 
 object Driver {
