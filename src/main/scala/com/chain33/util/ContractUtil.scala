@@ -26,7 +26,6 @@ import scala.collection.convert.ImplicitConversions.`seq AsJavaList`
 object ContractUtil {
   private val LEFT_RIGHT_BRACKETS                                  = "[]"
   private val CLASS_MAP: ConcurrentMap[String, java.lang.Class[_]] = Maps.newConcurrentMap()
-
   private val typeVec = Array {
     ((param: ContractParam) => ContractType.BOOL.equalsIgnoreCase(param.`type`), (param: ContractParam) => new Bool(Boolean.unbox(param.value)))
     ((param: ContractParam) => param.`type`.contains(ContractType.UINT) && !param.`type`.contains(LEFT_RIGHT_BRACKETS), (param: ContractParam) => reflectUintWithValue(param.`type`, param.value))
@@ -64,9 +63,7 @@ object ContractUtil {
 
   def convertInputParams(params: List[ContractParam]): List[Type[_]] = {
     val inputs = List.empty
-    params
-      .filter(param => !(StringUtils.isBlank(param.`type`) || StringUtils.isBlank(param.value)))
-      .foreach(value => inputs :+ convert(value))
+    params.filter(param => !(StringUtils.isBlank(param.`type`) || StringUtils.isBlank(param.value))).foreach(value => inputs :+ convert(value))
     inputs
   }
 
@@ -113,24 +110,29 @@ object ContractUtil {
       .orNull
   }
 
+  private def is(name:String): Option[Class[_]] = if (CLASS_MAP.containsKey(name)) Some(CLASS_MAP.get(name)) else Option.empty
+
+  private def getSetClass(name: String,fun: => Set[Class[_]])={
+    is(name).getOrElse(fun.find(_.getSimpleName.equalsIgnoreCase(name)).map(clazz => {
+      CLASS_MAP.put(name, clazz)
+      clazz
+    }).orNull)
+  }
+
   private def reflectUint(name: String): Class[_] = {
-    if (CLASS_MAP.containsKey(name)) {
-      CLASS_MAP.get(name)
-    } else {
+//    getSetClass(name,reflectUintChildren)
+    is(name).getOrElse(
       reflectUintChildren
-        .find(_.getSimpleName.equalsIgnoreCase(name))
-        .map(clazz => {
-          CLASS_MAP.put(name, clazz)
-          clazz
-        })
-        .orNull
-    }
+      .find(_.getSimpleName.equalsIgnoreCase(name))
+      .map(clazz => {
+        CLASS_MAP.put(name, clazz)
+        clazz
+      })
+      .orNull)
   }
 
   private def reflectBytes(name: String): Class[_] = {
-    if (CLASS_MAP.containsKey(name)) {
-      CLASS_MAP.get(name)
-    } else {
+    is(name).getOrElse(
       reflectBytesChildren
         .find(_.getSimpleName.equalsIgnoreCase(name))
         .map(clazz => {
@@ -138,7 +140,7 @@ object ContractUtil {
           clazz
         })
         .orNull
-    }
+    )
   }
 
   private def reflectUintChildren = {

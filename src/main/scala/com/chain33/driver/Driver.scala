@@ -22,7 +22,7 @@ import com.chain33.constant.Constant._
 import com.chain33.contract.ContractCall
 import cn.chain33.javasdk.model.rpcresult.QueryTransactionResult
 
-case class Driver(val connection: Connection) extends BaseDriver {
+case class Driver(connection: Connection) extends BaseDriver {
   override def start(): Unit = {}
 
   override def stop(): Unit = {}
