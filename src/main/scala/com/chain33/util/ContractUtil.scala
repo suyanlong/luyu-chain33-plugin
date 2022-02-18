@@ -1,5 +1,13 @@
 package com.chain33.util
 
+import scala.collection.convert.ImplicitConversions.`set asScala`
+import scala.collection.convert.ImplicitConversions.`seq AsJavaList`
+import java.math.BigInteger
+import java.util.concurrent.ConcurrentMap
+import com.google.common.collect.Maps
+import org.apache.commons.collections4.CollectionUtils
+import org.apache.commons.lang3.StringUtils
+import org.reflections.Reflections
 import com.citahub.cita.abi.TypeReference
 import com.citahub.cita.abi.datatypes.Address
 import com.citahub.cita.abi.datatypes.Bool
@@ -9,18 +17,9 @@ import com.citahub.cita.abi.datatypes.Function
 import com.citahub.cita.abi.datatypes.Type
 import com.citahub.cita.abi.datatypes.Uint
 import com.citahub.cita.abi.datatypes.Utf8String
-import com.google.common.collect.Maps
-
-import java.math.BigInteger
-import java.util.concurrent.ConcurrentMap
-import org.apache.commons.collections4.CollectionUtils
-import org.apache.commons.lang3.StringUtils
-import org.reflections.Reflections
 import com.chain33.contract._
 import com.chain33.constant._
 
-import scala.collection.convert.ImplicitConversions.`set asScala`
-import scala.collection.convert.ImplicitConversions.`seq AsJavaList`
 
 // format: off
 object ContractUtil {
