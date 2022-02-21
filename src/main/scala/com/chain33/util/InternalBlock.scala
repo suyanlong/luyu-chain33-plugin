@@ -1,8 +1,8 @@
 package com.chain33.util
 
-import cn.chain33.javasdk.model.rpcresult.BlockResult
-import link.luyu.protocol.network.Block
 import java.io.Serializable
+import link.luyu.protocol.network.Block
+import cn.chain33.javasdk.model.rpcresult.BlockResult
 
 class InternalBlock(val appBlock: BlockResult) extends Serializable {
   var blockNumber: Long = appBlock.getHeight
