@@ -6,8 +6,6 @@ import cn.chain33.javasdk.client._
 import com.chain33.constant.Constant._
 import com.chain33.util._
 import com.chain33.contract.ContractCall
-import com.citahub.cita.protocol.core.DefaultBlockParameterName
-import com.citahub.cita.protocol.core.methods.request.Call
 import com.fasterxml.jackson.databind.ObjectMapper
 
 import java.nio.charset.StandardCharsets
@@ -29,22 +27,17 @@ class Connection(val url: String) extends link.Connection {
     `type` match {
       case Type.SEND_TRANSACTION =>
         // TODO
-        val appSendTransaction = citAj.appSendRawTransaction(new String(data)).send
-        if (appSendTransaction.getError != null) {
-          val message = appSendTransaction.getError.getMessage
-          callback.onResponse(TransactionConstant.Result.ERROR, message, null)
-        } else callback.onResponse(Result.SUCCESS, "Success", appSendTransaction.getSendTransactionResult.getHash.getBytes)
+        val tx = client.submitTransaction(new String(data))
+        callback.onResponse(Result.SUCCESS, "Success", tx.getBytes)
 
       case Type.CALL_TRANSACTION =>
         val contractCall = Connection.OBJECT_MAPPER.readValue(data, classOf[ContractCall])
-        val call         = new Call(contractCall.sender, contractCall.contract, contractCall.data)
         // TODO
-        val result = citAj.appCall(call, DefaultBlockParameterName.PENDING).send.getValue
-        callback.onResponse(Result.SUCCESS, "Success", result.getBytes)
+        val jsonResult = client.callEVMAbi(contractCall.sender, contractCall.data)
+        callback.onResponse(Result.SUCCESS, "Success", jsonResult.toString.getBytes)
 
       case Type.GET_TRANSACTION_RECEIPT =>
-        val txHash  = data.toString
-        val receipt = client.queryTransaction(txHash) // TODO
+        val receipt = client.queryTransaction(data.toString) // TODO
         callback.onResponse(Result.SUCCESS, "Success", Utils.toByteArray(receipt))
 
       case Type.GET_ABI =>
@@ -82,5 +75,5 @@ class Connection(val url: String) extends link.Connection {
 }
 
 object Connection {
-  private var OBJECT_MAPPER = new ObjectMapper
+  private val OBJECT_MAPPER = new ObjectMapper
 }

@@ -78,7 +78,7 @@ case class Driver(connection: Connection) extends BaseDriver {
 
   override def getBlockByNumber(blockNumber: Long, callback: BaseDriver.BlockCallback): Unit = {
     connection.asyncSend(
-      "", // TODO
+      "/chain33/plugin", // TODO
       Type.GET_BLOCK_BY_NUMBER,
       Utils.longToBytes(blockNumber),
       (errorCode: Int, message: String, responseData: Array[Byte]) => {
