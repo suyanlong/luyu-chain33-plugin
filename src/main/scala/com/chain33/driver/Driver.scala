@@ -5,6 +5,7 @@ import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.{CompletableFuture, TimeUnit}
 import java.util
+import com.google.protobuf.ByteString
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import link.luyu.protocol.algorithm.ecdsa.secp256k1.SignatureData
 import link.luyu.protocol.algorithm.sm2.SM2WithSM3
@@ -12,15 +13,16 @@ import link.luyu.protocol.common.STATUS
 import link.luyu.protocol.link.{Driver => BaseDriver, _}
 import link.luyu.protocol.network.{Account, CallRequest, CallResponse, Events, Receipt, Resource, Transaction}
 import link.luyu.toolkit.abi.ContractABI
-
 import com.citahub.cita.abi.FunctionEncoder
-import com.citahub.cita.utils.{HexUtil, Numeric}
+import com.citahub.cita.utils.Numeric
 import com.citahub.cita.crypto.sm2.{SM2, SM2Keys}
-
 import com.chain33.util._
 import com.chain33.constant.Constant._
 import com.chain33.contract.ContractCall
+import cn.chain33.javasdk
 import cn.chain33.javasdk.model.rpcresult.QueryTransactionResult
+import cn.chain33.javasdk.model.protobuf.TransactionAllProtobuf.Signature
+import cn.chain33.javasdk.model.protobuf.{EvmService, TransactionAllProtobuf}
 
 case class Driver(connection: Connection) extends BaseDriver {
   override def start(): Unit = {}
@@ -98,13 +100,11 @@ case class Driver(connection: Connection) extends BaseDriver {
       txHash.getBytes,
       (_, _, responseData: Array[Byte]) => {
         Driver.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-//          val transactionReceipt = Driver.objectMapper.readValue(responseData, classOf[TransactionReceipt])
         val transactionReceipt = Driver.objectMapper.readValue(responseData, classOf[QueryTransactionResult])
         val receipt            = new Receipt
         receipt.setResult(Array[String](new String(responseData)))
         receipt.setBlockNumber(transactionReceipt.getHeight)
         receipt.setCode(0) // SUCCESS
-
         receipt.setMessage("Success")
         receipt.setTransactionBytes(responseData) // TODO
         receipt.setTransactionHash(txHash)
@@ -137,21 +137,28 @@ case class Driver(connection: Connection) extends BaseDriver {
               else {
                 val blockNumber = Utils.bytesToLong(responseData1)
                 // TODO chain33 Transaction
-                val tx = new Transaction(
-                  contract,
-                  ChainUtils.getNonce,
-                  10000000L,
-                  blockNumber + 88,
-                  ChainUtils.getVersion,
-                  ChainUtils.getChainId,
-                  "0",
-                  FunctionEncoder.encode(Utils.convertFunction(abi, transaction.getMethod, transaction.getArgs))
-                )
-
-                val bsTx           = tx.serializeRawTransaction(false)
-                val future         = new CompletableFuture[_]
+                // src/test/java/cn/chain33/javasdk/model/EvmTest.java
+                // 1、构造交易
+                // 2、签名：原始交易交给，陆羽签名服务中心统一签名
+                // 3、发送交易
+                // 4、得回执，并返回
+                // ------------------------------------------------------------------------------------------------------
+                // 1、构造交易
+                val contractAddr     = ""
+                val callData         = javasdk.utils.EvmUtil.encodeParameter(abi, transaction.getMethod, transaction.getArgs)
+                val evmActionBuilder = EvmService.EVMContractAction.newBuilder
+                evmActionBuilder.setPara(ByteString.copyFrom(callData))
+                evmActionBuilder.setContractAddr(contractAddr)
+                val evmContractAction = evmActionBuilder.build
+                val createTxWithoutSign = javasdk.utils.TransactionUtil
+                  .createTxWithoutSign(javasdk.utils.EvmUtil.execer, evmContractAction.toByteArray, javasdk.utils.TransactionUtil.DEFAULT_FEE, 0)
+                val fromHexString = javasdk.utils.HexUtil.fromHexString(createTxWithoutSign)
+                var protobufTx    = TransactionAllProtobuf.Transaction.parseFrom(fromHexString)
+                // ------------------------------------------------------------------------------------------------------
+                // 2、签名
+                val future         = new java.util.concurrent.CompletableFuture[Array[Byte]]
                 val pubKey         = account.getPubKey
-                val prepareMessage = SM2WithSM3.prepareMessage(pubKey, bsTx)
+                val prepareMessage = SM2WithSM3.prepareMessage(pubKey, protobufTx.toByteArray)
                 account.sign(
                   prepareMessage,
                   new Account.SignCallback() {
@@ -164,19 +171,18 @@ case class Driver(connection: Connection) extends BaseDriver {
                 val luyuSignBytes = future.get(30, TimeUnit.SECONDS)
                 val luyuSignData  = SignatureData.parseFrom(luyuSignBytes)
                 val signature     = new SM2.Signature(luyuSignData.getR, luyuSignData.getS)
-                val sig           = Driver.join(HexUtil.hexToBytes(signature.getSign), pubKey)
-                val raw_tx        = tx.serializeUnverifiedTransaction(sig, bsTx)
-
+                val sig           = Driver.join(javasdk.utils.HexUtil.hexStringToBytes(signature.getSign), pubKey) // 得签名
+                protobufTx = protobufTx.toBuilder.setSignature(Signature.parseFrom(sig)).build()
                 connection.asyncSend(
                   transaction.getPath,
                   Type.SEND_TRANSACTION,
-                  raw_tx.getBytes(StandardCharsets.UTF_8),
+                  javasdk.utils.HexUtil.toHexString(protobufTx.toByteArray).getBytes(StandardCharsets.UTF_8),
                   (errorCode2: Int, msg2: String, responseData2: Array[Byte]) => {
                     // todo verify transaction on-chain proof
                     if (errorCode2 != STATUS.OK) callback.onResponse(errorCode2, msg2, null)
                     else {
                       val receipt = new Receipt
-                      receipt.setBlockNumber(123)
+                      receipt.setBlockNumber(123) // TODO bug
                       receipt.setMethod(transaction.getMethod)
                       receipt.setArgs(transaction.getArgs)
                       receipt.setPath(transaction.getPath)

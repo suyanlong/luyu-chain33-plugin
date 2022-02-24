@@ -3,6 +3,7 @@ package com.chain33.util
 import java.math.BigInteger
 import java.util.Random
 
+// TODO 配置文件加载
 object ChainUtils {
   private val version        = 2
   private val chainId        = BigInteger.valueOf(1L)
