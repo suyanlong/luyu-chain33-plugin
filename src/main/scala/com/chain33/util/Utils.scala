@@ -12,7 +12,6 @@ import com.chain33.contract.ABI
 import com.chain33.contract.AbiFunctionType
 import com.chain33.contract.ContractParam
 
-
 object Utils {
   def getResourceName(path: String): String = {
     val sp = path.split("\\.")

@@ -170,8 +170,10 @@ case class Driver(connection: Connection) extends BaseDriver {
                 )
                 val luyuSignBytes = future.get(30, TimeUnit.SECONDS)
                 val luyuSignData  = SignatureData.parseFrom(luyuSignBytes)
-                val signature     = new SM2.Signature(luyuSignData.getR, luyuSignData.getS)
-                val sig           = Driver.join(javasdk.utils.HexUtil.hexStringToBytes(signature.getSign), pubKey) // 得签名
+//                val signature     =  new javasdk.model.gm.SM2Util.SM2Signature(luyuSignData.getR, luyuSignData.getS)
+//                val sig           = Driver.join(javasdk.utils.HexUtil.hexStringToBytes(signature.), pubKey) // 得签名
+                val signature = new SM2.Signature(luyuSignData.getR, luyuSignData.getS)
+                val sig       = Driver.join(javasdk.utils.HexUtil.hexStringToBytes(signature.getSign), pubKey) // 得签名
                 protobufTx = protobufTx.toBuilder.setSignature(Signature.parseFrom(sig)).build()
                 connection.asyncSend(
                   transaction.getPath,
@@ -218,12 +220,13 @@ case class Driver(connection: Connection) extends BaseDriver {
           val raw_abi = new String(responseData, StandardCharsets.UTF_8)
           val abi     = Utils.hexStr2Str(Utils.hexRemove0x(raw_abi))
           val ctAbi   = new ContractABI(abi)
-          // TODO
+          // TODO bug
           val funAbi   = ctAbi.getFunctions(callRequest.getMethod).get(0)
           val function = Utils.convertFunction(abi, callRequest.getMethod, callRequest.getArgs)
           val call     = new ContractCall(contract, FunctionEncoder.encode(function))
           val pubKey   = account.getPubKey
-          val sender   = SM2Keys.getAddress(Numeric.toHexStringWithPrefixZeroPadded(new BigInteger(1, pubKey), 128))
+          // TODO bug
+          val sender = SM2Keys.getAddress(Numeric.toHexStringWithPrefixZeroPadded(new BigInteger(1, pubKey), 128))
           call.sender_=("0x" + sender)
           val data = Driver.objectMapper.writeValueAsBytes(call)
           connection.asyncSend(
