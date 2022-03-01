@@ -5,7 +5,6 @@ import scala.collection.convert.ImplicitConversions.`seq AsJavaList`
 import java.math.BigInteger
 import java.util.concurrent.ConcurrentMap
 import com.google.common.collect.Maps
-import org.apache.commons.collections4.CollectionUtils
 import org.apache.commons.lang3.StringUtils
 import org.reflections.Reflections
 import com.citahub.cita.abi.TypeReference
@@ -60,11 +59,18 @@ object ContractUtil {
     )
   }
 
-  def convertInputParams(params: List[ContractParam]): List[Type[_]] = {
-    val inputs = List.empty
-    params.filter(param => !(StringUtils.isBlank(param.`type`) || StringUtils.isBlank(param.value))).foreach(value => inputs :+ convert(value))
-    inputs
+  private val outVec = Array{
+    ((str:String) => str.contains(ContractType.UINT) && !str.contains(LEFT_RIGHT_BRACKETS),(str:String) => new TypeReference[Uint]() { override def getType: java.lang.reflect.Type = reflectUint(str) })
+    ((str:String) => ContractType.BOOL.equalsIgnoreCase(str),(str:String) => new TypeReference[Bool]() {} )
+    ((str:String) => ContractType.ADDRESS.equalsIgnoreCase(str),(str:String) => new TypeReference[Address]() {})
+    ((str:String) => ContractType.STRING.equalsIgnoreCase(str),(str:String) => new TypeReference[Utf8String]() {})
+    ((str:String) => str.contains(ContractType.BYTES) && !str.contains(LEFT_RIGHT_BRACKETS),(str:String) => new TypeReference[Bytes]() { override def getType: java.lang.reflect.Type = reflectBytes(str) } )
+    ((str:String) => str.contains(ContractType.UINT) && str.contains(LEFT_RIGHT_BRACKETS),(str:String) => ClassTransferUtil.transfer(str.substring(0, str.length - 2)))
+    ((str:String) => str.contains(ContractType.BYTES) && str.contains(LEFT_RIGHT_BRACKETS),(str:String) => ClassTransferUtil.transfer(str.substring(0, str.length - 2)))
+    ((str:String) => ContractType.ADDRESS_ARRAY.equalsIgnoreCase(str),(str:String) => new TypeReference[DynamicArray[Address]]() {})
   }
+
+  def convertInputParams(params: List[ContractParam]): List[Type[_]] = params.filter(param => !(StringUtils.isBlank(param.`type`) || StringUtils.isBlank(param.value))).map(value => convert(value))
 
   private def convert(param: ContractParam): Type[_] = typeVec.find(_._1(param)).map(_._2(param)).orNull
 
@@ -74,29 +80,8 @@ object ContractUtil {
       out: List[String]
   ): Function = {
     val inputs = convertInputParams(params)
-    if (CollectionUtils.isEmpty(out)) {
-      new Function(methodName, inputs, List[TypeReference[_]]())
-    } else {
-      var output: List[TypeReference[_]] = List.empty
-      out.foreach(str => {
-        output = output :+ {
-          if (str.contains(ContractType.UINT) && !str.contains(LEFT_RIGHT_BRACKETS))
-            (new TypeReference[Uint]() { override def getType: java.lang.reflect.Type = reflectUint(str) })
-          else if (ContractType.BOOL.equalsIgnoreCase(str)) (new TypeReference[Bool]() {})
-          else if (ContractType.ADDRESS.equalsIgnoreCase(str)) (new TypeReference[Address]() {})
-          else if (ContractType.STRING.equalsIgnoreCase(str)) (new TypeReference[Utf8String]() {})
-          else if (str.contains(ContractType.BYTES) && !str.contains(LEFT_RIGHT_BRACKETS))
-            (new TypeReference[Bytes]() { override def getType: java.lang.reflect.Type = reflectBytes(str) })
-          else if (str.contains(ContractType.UINT) && str.contains(LEFT_RIGHT_BRACKETS))(ClassTransferUtil.transfer(str.substring(0, str.length - 2)))
-          else if (str.contains(ContractType.BYTES) && str.contains(LEFT_RIGHT_BRACKETS))(ClassTransferUtil.transfer(
-            str.substring(0, str.length - 2)
-          ))
-          else if (ContractType.ADDRESS_ARRAY.equalsIgnoreCase(str)) (new TypeReference[DynamicArray[Address]]() {})
-          else null
-        }
-      })
-      new Function(methodName, inputs, output)
-    }
+    val output = out.map(str => outVec.find(_._1(str)).map(_._2(str)).orNull)
+    new Function(methodName, inputs, output)
   }
 
   private def reflectUintWithValue(name: String, value: String): Uint = {
