@@ -46,16 +46,20 @@ case class Driver(connection: Connection) extends BaseDriver {
     callback.onResponse(0, "Success", resources.toArray(new Array[Resource](resources.size)))
   }
 
+//  private call(code,msg,callback:):Unit ={
+//
+//  }
+
   override def getBlockByHash(blockHash: String, callback: BaseDriver.BlockCallback): Unit = {
     connection.asyncSend(
-      blockHash,
+      "",
       Type.GET_BLOCK_BY_HASH,
-      null,
-      (errorCode: Int, message: String, responseData: Array[Byte]) => {
-        if (errorCode != STATUS.OK) callback.onResponse(errorCode, message, null)
+      blockHash.getBytes,
+      (code, msg, block) => {
+        if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
-          val block = Utils.toObject(responseData).asInstanceOf[InternalBlock]
-          callback.onResponse(STATUS.OK, "Success", block.toBlock)
+          val blk = Utils.toObject(block).asInstanceOf[InternalBlock]
+          callback.onResponse(STATUS.OK, "Success", blk.toBlock)
         }
       }
     )
@@ -67,11 +71,9 @@ case class Driver(connection: Connection) extends BaseDriver {
       "",
       Type.GET_BLOCK_NUMBER,
       null,
-      new Connection.Callback() {
-        override def onResponse(errorCode: Int, message: String, responseData: Array[Byte]): Unit = {
-          if (errorCode != STATUS.OK) getBlockNumberFuture.complete(null)
-          else getBlockNumberFuture.complete(responseData)
-        }
+      (code, _, height) => {
+        if (code != STATUS.OK) getBlockNumberFuture.complete(null)
+        else getBlockNumberFuture.complete(height)
       }
     )
     val bsBlockNumber = getBlockNumberFuture.get(20, TimeUnit.SECONDS)
@@ -80,14 +82,14 @@ case class Driver(connection: Connection) extends BaseDriver {
 
   override def getBlockByNumber(blockNumber: Long, callback: BaseDriver.BlockCallback): Unit = {
     connection.asyncSend(
-      "/chain33/plugin", // TODO
+      "",
       Type.GET_BLOCK_BY_NUMBER,
       Utils.longToBytes(blockNumber),
-      (errorCode: Int, message: String, responseData: Array[Byte]) => {
-        if (errorCode != STATUS.OK) callback.onResponse(errorCode, message, null)
+      (code, msg, block: Array[Byte]) => {
+        if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
-          val block = Utils.toObject(responseData).asInstanceOf[InternalBlock]
-          callback.onResponse(STATUS.OK, "Success", block.toBlock)
+          val blk = Utils.toObject(block).asInstanceOf[InternalBlock]
+          callback.onResponse(STATUS.OK, "Success", blk.toBlock)
         }
       }
     )
@@ -98,15 +100,15 @@ case class Driver(connection: Connection) extends BaseDriver {
       null,
       Type.GET_TRANSACTION_RECEIPT,
       txHash.getBytes,
-      (_, _, responseData: Array[Byte]) => {
+      (_, _, r) => {
         Driver.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-        val transactionReceipt = Driver.objectMapper.readValue(responseData, classOf[QueryTransactionResult])
+        val transactionReceipt = Driver.objectMapper.readValue(r, classOf[QueryTransactionResult])
         val receipt            = new Receipt
-        receipt.setResult(Array[String](new String(responseData)))
+        receipt.setResult(Array[String](new String(r))) // TODO
         receipt.setBlockNumber(transactionReceipt.getHeight)
         receipt.setCode(0) // SUCCESS
         receipt.setMessage("Success")
-        receipt.setTransactionBytes(responseData) // TODO
+        receipt.setTransactionBytes(transactionReceipt.getTx.getRawpayload.getBytes()) // TODO
         receipt.setTransactionHash(txHash)
         callback.onResponse(STATUS.OK, "Success", receipt)
       }
@@ -123,80 +125,74 @@ case class Driver(connection: Connection) extends BaseDriver {
       contract,
       Type.GET_ABI,
       null,
-      (errorCode: Int, msg: String, responseData: Array[Byte]) => {
-        if (errorCode != STATUS.OK) callback.onResponse(errorCode, msg, null)
+      (code, msg, abiRaw: Array[Byte]) => {
+        if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
-          val raw_abi = new String(responseData, StandardCharsets.UTF_8)
-          val abi     = Utils.hexStr2Str(Utils.hexRemove0x(raw_abi))
-          connection.asyncSend(
-            "",
-            Type.GET_BLOCK_NUMBER,
-            null,
-            (errorCode1: Int, msg1: String, responseData1: Array[Byte]) => {
-              if (errorCode1 != STATUS.OK) callback.onResponse(errorCode1, msg1, null)
-              else {
-                val blockNumber = Utils.bytesToLong(responseData1)
-                // TODO chain33 Transaction
-                // src/test/java/cn/chain33/javasdk/model/EvmTest.java
-                // 1、构造交易
-                // 2、签名：原始交易交给，陆羽签名服务中心统一签名
-                // 3、发送交易
-                // 4、得回执，并返回
-                // ------------------------------------------------------------------------------------------------------
-                // 1、构造交易
-                val contractAddr     = ""
-                val callData         = javasdk.utils.EvmUtil.encodeParameter(abi, transaction.getMethod, transaction.getArgs)
-                val evmActionBuilder = EvmService.EVMContractAction.newBuilder
-                evmActionBuilder.setPara(ByteString.copyFrom(callData))
-                evmActionBuilder.setContractAddr(contractAddr)
-                val evmContractAction = evmActionBuilder.build
-                val createTxWithoutSign = javasdk.utils.TransactionUtil
-                  .createTxWithoutSign(javasdk.utils.EvmUtil.execer, evmContractAction.toByteArray, javasdk.utils.TransactionUtil.DEFAULT_FEE, 0)
-                val fromHexString = javasdk.utils.HexUtil.fromHexString(createTxWithoutSign)
-                var protobufTx    = TransactionAllProtobuf.Transaction.parseFrom(fromHexString)
-                // ------------------------------------------------------------------------------------------------------
-                // 2、签名
-                val future         = new java.util.concurrent.CompletableFuture[Array[Byte]]
-                val pubKey         = account.getPubKey
-                val prepareMessage = SM2WithSM3.prepareMessage(pubKey, protobufTx.toByteArray)
-                account.sign(
-                  prepareMessage,
-                  new Account.SignCallback() {
-                    override def onResponse(status: Int, message: String, signBytes: Array[Byte]): Unit = {
-                      if (status != STATUS.OK) future.complete(null)
-                      else future.complete(signBytes)
-                    }
-                  }
-                )
-                val luyuSignBytes = future.get(30, TimeUnit.SECONDS)
-                val luyuSignData  = SignatureData.parseFrom(luyuSignBytes)
+          val a   = new String(abiRaw, StandardCharsets.UTF_8)
+          val abi = Utils.hexStr2Str(Utils.hexRemove0x(a))
+          // TODO chain33 Transaction
+          // src/test/java/cn/chain33/javasdk/model/EvmTest.java
+          // 1、构造交易
+          // 2、签名：原始交易交给，陆羽签名服务中心统一签名
+          // 3、发送交易
+          // 4、得回执，并返回
+          // ------------------------------------------------------------------------------------------------------
+          // 1、构造交易
+          val contractAddr     = "" // TODO
+          val callData         = javasdk.utils.EvmUtil.encodeParameter(abi, transaction.getMethod, transaction.getArgs)
+          val evmActionBuilder = EvmService.EVMContractAction.newBuilder
+          evmActionBuilder.setPara(ByteString.copyFrom(callData))
+          evmActionBuilder.setContractAddr(contractAddr)
+          val evmContractAction = evmActionBuilder.build
+          val createTxWithoutSign = javasdk.utils.TransactionUtil
+            .createTxWithoutSign(javasdk.utils.EvmUtil.execer, evmContractAction.toByteArray, javasdk.utils.TransactionUtil.DEFAULT_FEE, 0)
+          val fromHexString = javasdk.utils.HexUtil.fromHexString(createTxWithoutSign)
+          var protobufTx    = TransactionAllProtobuf.Transaction.parseFrom(fromHexString)
+          // ------------------------------------------------------------------------------------------------------
+          // 2、签名
+          val future         = new java.util.concurrent.CompletableFuture[Array[Byte]]
+          val pubKey         = account.getPubKey
+          val prepareMessage = SM2WithSM3.prepareMessage(pubKey, protobufTx.toByteArray)
+          account.sign(
+            prepareMessage,
+            (code, _, signBytes) =>
+              if (code != STATUS.OK) future.complete(null)
+              else future.complete(signBytes)
+          )
+          val luyuSignBytes = future.get(30, TimeUnit.SECONDS)
+          val luyuSignData  = SignatureData.parseFrom(luyuSignBytes)
 //                val signature     =  new javasdk.model.gm.SM2Util.SM2Signature(luyuSignData.getR, luyuSignData.getS)
 //                val sig           = Driver.join(javasdk.utils.HexUtil.hexStringToBytes(signature.), pubKey) // 得签名
-                val signature = new SM2.Signature(luyuSignData.getR, luyuSignData.getS)
-                val sig       = Driver.join(javasdk.utils.HexUtil.hexStringToBytes(signature.getSign), pubKey) // 得签名
-                protobufTx = protobufTx.toBuilder.setSignature(Signature.parseFrom(sig)).build()
-                connection.asyncSend(
-                  transaction.getPath,
-                  Type.SEND_TRANSACTION,
-                  javasdk.utils.HexUtil.toHexString(protobufTx.toByteArray).getBytes(StandardCharsets.UTF_8),
-                  (errorCode2: Int, msg2: String, responseData2: Array[Byte]) => {
-                    // todo verify transaction on-chain proof
-                    if (errorCode2 != STATUS.OK) callback.onResponse(errorCode2, msg2, null)
-                    else {
-                      val receipt = new Receipt
-                      receipt.setBlockNumber(123) // TODO bug
-                      receipt.setMethod(transaction.getMethod)
-                      receipt.setArgs(transaction.getArgs)
-                      receipt.setPath(transaction.getPath)
-                      receipt.setCode(0) // SUCCESS
-                      receipt.setMessage("Success")
-                      receipt.setTransactionBytes(responseData2)
-                      receipt.setTransactionHash(new String(responseData2))
-                      callback.onResponse(STATUS.OK, "Success", receipt)
-                    }
+          val signature = new SM2.Signature(luyuSignData.getR, luyuSignData.getS)
+          val sig       = Driver.join(javasdk.utils.HexUtil.hexStringToBytes(signature.getSign), pubKey) // 得签名
+          protobufTx = protobufTx.toBuilder.setSignature(Signature.parseFrom(sig)).build()
+          connection.asyncSend(
+            transaction.getPath,
+            Type.SEND_TRANSACTION,
+            javasdk.utils.HexUtil.toHexString(protobufTx.toByteArray).getBytes(StandardCharsets.UTF_8),
+            (_, _, txHash) => {
+              connection.asyncSend(
+                "",
+                Type.GET_TRANSACTION_RECEIPT,
+                txHash,
+                (code, msg, receipt) => {
+                  val r = Utils.toObject(receipt).asInstanceOf[QueryTransactionResult]
+                  // todo verify transaction on-chain proof
+                  if (code != STATUS.OK) callback.onResponse(code, msg, null)
+                  else {
+                    val receipt = new Receipt
+                    receipt.setBlockNumber(r.getHeight)
+                    receipt.setMethod(transaction.getMethod)
+                    receipt.setArgs(transaction.getArgs)
+                    receipt.setPath(transaction.getPath)
+                    receipt.setCode(0) // SUCCESS
+                    receipt.setMessage("Success")
+                    receipt.setTransactionBytes(r.getTx.getRawpayload.getBytes)
+                    receipt.setTransactionHash(txHash.toString)
+                    callback.onResponse(STATUS.OK, "Success", receipt)
                   }
-                )
-              }
+                }
+              )
             }
           )
         }
@@ -214,12 +210,12 @@ case class Driver(connection: Connection) extends BaseDriver {
       contract,
       Type.GET_ABI,
       null,
-      (errorCode: Int, msg: String, responseData: Array[Byte]) => {
-        if (errorCode != STATUS.OK) callback.onResponse(errorCode, msg, null)
+      (code, msg, abiRaw) => {
+        if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
-          val raw_abi = new String(responseData, StandardCharsets.UTF_8)
-          val abi     = Utils.hexStr2Str(Utils.hexRemove0x(raw_abi))
-          val ctAbi   = new ContractABI(abi)
+          val a     = new String(abiRaw, StandardCharsets.UTF_8)
+          val abi   = Utils.hexStr2Str(Utils.hexRemove0x(a))
+          val ctAbi = new ContractABI(abi)
           // TODO bug
           val funAbi   = ctAbi.getFunctions(callRequest.getMethod).get(0)
           val function = Utils.convertFunction(abi, callRequest.getMethod, callRequest.getArgs)
@@ -233,10 +229,10 @@ case class Driver(connection: Connection) extends BaseDriver {
             callRequest.getPath,
             Type.CALL_TRANSACTION,
             data,
-            (_, _, responseData1: Array[Byte]) => {
+            (_, _, fun) => {
               val callResponse = new CallResponse
-              if (responseData1 != null) {
-                val resp = new String(responseData1)
+              if (fun != null) {
+                val resp = new String(fun)
                 if (!(resp == "0x")) callResponse.setResult(funAbi.decodeOutput(resp))
               }
               callResponse.setCode(0) // original receipt status

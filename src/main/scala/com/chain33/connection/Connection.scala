@@ -18,6 +18,7 @@ class Connection(val url: String) extends link.Connection {
 
   override def stop(): Unit = {}
 
+  // chain33 rpc api call
   override def asyncSend(
       path: String,
       `type`: Int,
@@ -28,34 +29,45 @@ class Connection(val url: String) extends link.Connection {
       case Type.SEND_TRANSACTION =>
         // TODO
         val tx = client.submitTransaction(new String(data))
-        callback.onResponse(Result.SUCCESS, "Success", tx.getBytes)
+        call(tx, callback, () => tx.getBytes)
 
       case Type.CALL_TRANSACTION =>
         val contractCall = Connection.OBJECT_MAPPER.readValue(data, classOf[ContractCall])
         // TODO
         val jsonResult = client.callEVMAbi(contractCall.sender, contractCall.data)
-        callback.onResponse(Result.SUCCESS, "Success", jsonResult.toString.getBytes)
+        call(jsonResult, callback, () => jsonResult.toString.getBytes)
 
       case Type.GET_TRANSACTION_RECEIPT =>
         val receipt = client.queryTransaction(data.toString) // TODO
-        callback.onResponse(Result.SUCCESS, "Success", Utils.toByteArray(receipt))
-
+        call(receipt, callback, () => Utils.toByteArray(receipt))
       case Type.GET_ABI =>
-        val abi = client.queryEVMABIInfo(path, "storage").toString
-        callback.onResponse(Result.SUCCESS, "Success", abi.getBytes(StandardCharsets.UTF_8))
+        val abi = client.queryEVMABIInfo(path, "storage")
+        call(abi, callback, () => abi.toString.getBytes(StandardCharsets.UTF_8))
+
       case Type.GET_BLOCK_NUMBER =>
-        callback.onResponse(Result.SUCCESS, "Success", Utils.longToBytes(client.getLastHeader.getHeight))
+        val header = client.getLastHeader
+        call(header, callback, () => Utils.longToBytes(header.getHeight))
+
       case Type.GET_BLOCK_BY_HASH =>
-        val blockHash = path // TODO
-        val appBlock  = client.getBlockByHashes(Array { blockHash }, true).get(0)
-        val blk       = new InternalBlock(appBlock)
-        callback.onResponse(STATUS.OK, "Success", Utils.toByteArray(blk))
+        val blockHash = data.toString
+        val appBlock  = client.getBlockByHashes(Array { blockHash }, true)
+        call(appBlock, callback, () => Utils.toByteArray(new InternalBlock(appBlock.get(0))))
+
       case Type.GET_BLOCK_BY_NUMBER =>
         val blockNumber = Utils.bytesToLong(data)
-        val blk         = client.getBlocks(blockNumber, blockNumber, true).get(0)
-        callback.onResponse(STATUS.OK, "Success", Utils.toByteArray(new InternalBlock(blk.getBlock)))
+        val blk         = client.getBlocks(blockNumber, blockNumber, true)
+        call(blk, callback, () => Utils.toByteArray(new InternalBlock(blk.get(0).getBlock)))
+
       case _ => callback.onResponse(Result.ERROR, "Unrecognized type of " + `type`, null)
 
+    }
+  }
+
+  private def call(obj: Object, callback: link.Connection.Callback, data: () => Array[Byte]): Unit = {
+    if (obj == null) {
+      callback.onResponse(Result.ERROR, "Error", null)
+    } else {
+      callback.onResponse(STATUS.OK, "Success", data())
     }
   }
 
