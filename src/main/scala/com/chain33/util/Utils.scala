@@ -3,11 +3,9 @@ package com.chain33.util
 import java.io._
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.citahub.cita.abi.datatypes.Function
-
 import com.chain33.contract.ABI
 import com.chain33.contract.AbiFunctionType
 import com.chain33.contract.ContractParam
@@ -35,16 +33,16 @@ object Utils {
           param.value = args(i)
           params = params :+ param
         }
-        ContractUtil.convertFunction(name, params, outs)
+        return ContractUtil.convertFunction(name, params, outs)
       }
     }
     null
   }
 
   def parseAbi(abi: String): List[ABI] = {
-    var abis: List[ABI] = List.empty
-    val objectMapper    = new ObjectMapper
-    val trees           = objectMapper.readTree(abi)
+    var abis         = List.empty[ABI]
+    val objectMapper = new ObjectMapper
+    val trees        = objectMapper.readTree(abi)
     trees.forEach((tree: JsonNode) => {
       val `type` = tree.get("type").asText
       if ("function".equalsIgnoreCase(`type`)) {
@@ -59,11 +57,12 @@ object Utils {
   }
 
   def makeType(node: JsonNode): List[AbiFunctionType] = {
-    val result = List.empty
+    var result = List.empty[AbiFunctionType]
     node.forEach((input: JsonNode) => {
       val functionType = new AbiFunctionType
       functionType.`type` = input.get("type").asText
       functionType.name = input.get("name").asText
+      result = result :+ functionType
     })
     result
   }
@@ -97,22 +96,20 @@ object Utils {
   }
 
   def toByteArray(obj: Any): Array[Byte] = {
-    var bytes: Array[Byte] = Array.emptyByteArray
-    val bos                = new ByteArrayOutputStream
-    val oos                = new ObjectOutputStream(bos)
+    val bos = new ByteArrayOutputStream
+    val oos = new ObjectOutputStream(bos)
     oos.writeObject(obj)
     oos.flush()
-    bytes = bos.toByteArray
+    val bytes = bos.toByteArray
     oos.close()
     bos.close()
     bytes
   }
 
   def toObject(bytes: Array[Byte]): Any = {
-    var obj: Any = Nil
-    val bis      = new ByteArrayInputStream(bytes)
-    val ois      = new ObjectInputStream(bis)
-    obj = ois.readObject()
+    val bis = new ByteArrayInputStream(bytes)
+    val ois = new ObjectInputStream(bis)
+    val obj = ois.readObject()
     ois.close()
     bis.close()
     obj
