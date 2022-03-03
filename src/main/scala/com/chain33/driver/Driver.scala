@@ -43,12 +43,8 @@ case class Driver(connection: Connection) extends BaseDriver {
     resource.setType(getType)
     resource.setMethods(Array.empty)
     resources.add(resource)
-    callback.onResponse(0, "Success", resources.toArray(new Array[Resource](resources.size)))
+    callback.onResponse(STATUS.OK, "Success", resources.toArray(new Array[Resource](resources.size)))
   }
-
-//  private call(code,msg,callback:):Unit ={
-//
-//  }
 
   override def getBlockByHash(blockHash: String, callback: BaseDriver.BlockCallback): Unit = {
     connection.asyncSend(
@@ -59,7 +55,7 @@ case class Driver(connection: Connection) extends BaseDriver {
         if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
           val blk = Utils.toObject(block).asInstanceOf[InternalBlock]
-          callback.onResponse(STATUS.OK, "Success", blk.toBlock)
+          callback.onResponse(code, "Success", blk.toBlock)
         }
       }
     )
@@ -85,11 +81,11 @@ case class Driver(connection: Connection) extends BaseDriver {
       "",
       Type.GET_BLOCK_BY_NUMBER,
       Utils.longToBytes(blockNumber),
-      (code, msg, block: Array[Byte]) => {
+      (code, msg, block) => {
         if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
           val blk = Utils.toObject(block).asInstanceOf[InternalBlock]
-          callback.onResponse(STATUS.OK, "Success", blk.toBlock)
+          callback.onResponse(code, "Success", blk.toBlock)
         }
       }
     )
@@ -97,20 +93,23 @@ case class Driver(connection: Connection) extends BaseDriver {
 
   override def getTransactionReceipt(txHash: String, callback: BaseDriver.ReceiptCallback): Unit = {
     connection.asyncSend(
-      null,
+      "",
       Type.GET_TRANSACTION_RECEIPT,
       txHash.getBytes,
-      (_, _, r) => {
-        Driver.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-        val transactionReceipt = Driver.objectMapper.readValue(r, classOf[QueryTransactionResult])
-        val receipt            = new Receipt
-        receipt.setResult(Array[String](new String(r))) // TODO
-        receipt.setBlockNumber(transactionReceipt.getHeight)
-        receipt.setCode(0) // SUCCESS
-        receipt.setMessage("Success")
-        receipt.setTransactionBytes(transactionReceipt.getTx.getRawpayload.getBytes()) // TODO
-        receipt.setTransactionHash(txHash)
-        callback.onResponse(STATUS.OK, "Success", receipt)
+      (code, msg, r) => {
+        if (code != STATUS.OK) callback.onResponse(code, msg, null)
+        else {
+          Driver.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+          val transactionReceipt = Driver.objectMapper.readValue(r, classOf[QueryTransactionResult]) // TODO
+          val receipt            = new Receipt
+          receipt.setResult(Array[String](new String(r))) // TODO
+          receipt.setBlockNumber(transactionReceipt.getHeight)
+          receipt.setCode(0) // SUCCESS
+          receipt.setMessage("Success")
+          receipt.setTransactionBytes(transactionReceipt.getTx.getRawpayload.getBytes()) // TODO
+          receipt.setTransactionHash(txHash)
+          callback.onResponse(code, "Success", receipt)
+        }
       }
     )
   }
@@ -125,7 +124,7 @@ case class Driver(connection: Connection) extends BaseDriver {
       contract,
       Type.GET_ABI,
       null,
-      (code, msg, abiRaw: Array[Byte]) => {
+      (code, msg, abiRaw) => {
         if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
           val a   = new String(abiRaw, StandardCharsets.UTF_8)
@@ -175,11 +174,11 @@ case class Driver(connection: Connection) extends BaseDriver {
                 "",
                 Type.GET_TRANSACTION_RECEIPT,
                 txHash,
-                (code, msg, receipt) => {
-                  val r = Utils.toObject(receipt).asInstanceOf[QueryTransactionResult]
+                (code, msg, receiptRaw) => {
                   // todo verify transaction on-chain proof
                   if (code != STATUS.OK) callback.onResponse(code, msg, null)
                   else {
+                    val r       = Utils.toObject(receiptRaw).asInstanceOf[QueryTransactionResult]
                     val receipt = new Receipt
                     receipt.setBlockNumber(r.getHeight)
                     receipt.setMethod(transaction.getMethod)
@@ -189,7 +188,7 @@ case class Driver(connection: Connection) extends BaseDriver {
                     receipt.setMessage("Success")
                     receipt.setTransactionBytes(r.getTx.getRawpayload.getBytes)
                     receipt.setTransactionHash(txHash.toString)
-                    callback.onResponse(STATUS.OK, "Success", receipt)
+                    callback.onResponse(code, "Success", receipt)
                   }
                 }
               )
@@ -206,8 +205,10 @@ case class Driver(connection: Connection) extends BaseDriver {
       callback: BaseDriver.CallResponseCallback
   ): Unit = {
     val contract = Utils.getResourceName(callRequest.getPath)
+    val address  = contract // TODO???
+
     connection.asyncSend(
-      contract,
+      address, // TODO???
       Type.GET_ABI,
       null,
       (code, msg, abiRaw) => {
@@ -226,21 +227,24 @@ case class Driver(connection: Connection) extends BaseDriver {
           call.sender_=("0x" + sender)
           val data = Driver.objectMapper.writeValueAsBytes(call)
           connection.asyncSend(
-            callRequest.getPath,
+            callRequest.getPath, // TODO
             Type.CALL_TRANSACTION,
             data,
-            (_, _, fun) => {
-              val callResponse = new CallResponse
-              if (fun != null) {
-                val resp = new String(fun)
-                if (!(resp == "0x")) callResponse.setResult(funAbi.decodeOutput(resp))
+            (code, msg, fun) => {
+              if (code != STATUS.OK) callback.onResponse(code, msg, null)
+              else {
+                val callResponse = new CallResponse
+                if (fun != null) {
+                  val resp = new String(fun)
+                  if (!(resp == "0x")) callResponse.setResult(funAbi.decodeOutput(resp))
+                }
+                callResponse.setCode(0) // original receipt status
+                callResponse.setMessage("Success")
+                callResponse.setMethod(callRequest.getMethod)
+                callResponse.setArgs(callRequest.getArgs)
+                callResponse.setPath(callRequest.getPath)
+                callback.onResponse(code, "Success", callResponse)
               }
-              callResponse.setCode(0) // original receipt status
-              callResponse.setMessage("Success")
-              callResponse.setMethod(callRequest.getMethod)
-              callResponse.setArgs(callRequest.getArgs)
-              callResponse.setPath(callRequest.getPath)
-              callback.onResponse(STATUS.OK, "Success", callResponse)
             }
           )
         }

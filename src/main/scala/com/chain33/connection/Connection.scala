@@ -41,7 +41,7 @@ class Connection(val url: String) extends link.Connection {
         val receipt = client.queryTransaction(data.toString) // TODO
         call(receipt, callback, () => Utils.toByteArray(receipt))
       case Type.GET_ABI =>
-        val abi = client.queryEVMABIInfo(path, "storage")
+        val abi = client.queryEVMABIInfo(path, "storage") // TODO
         call(abi, callback, () => abi.toString.getBytes(StandardCharsets.UTF_8))
 
       case Type.GET_BLOCK_NUMBER =>
