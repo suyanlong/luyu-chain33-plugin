@@ -17,26 +17,27 @@ object Utils {
   }
 
   def convertFunction(abiString: String, name: String, args: Array[String]): Function = {
-    val abis = parseAbi(abiString)
-    for (abi <- abis) {
-      if (abi.name.equalsIgnoreCase(name)) {
+    parseAbi(abiString)
+      .find(_.name.equalsIgnoreCase(name))
+      .map(abi => {
         val outs = List.empty
         abi.outputTypes.foreach((`type`: AbiFunctionType) => outs :+ (`type`.`type`))
         val inputs = abi.inputTypes
-        if (null == args || args.length == 0) return ContractUtil.convertFunction(name, null, outs)
-        if (args.length != inputs.size)
-          throw new RuntimeException("input args number not equals to abi")
-        var params: List[ContractParam] = List.empty
-        for (i <- inputs.indices) {
-          val param = new ContractParam
-          param.`type` = inputs(i).`type`
-          param.value = args(i)
-          params = params :+ param
+        if (null == args || args.length == 0) ContractUtil.convertFunction(name, null, outs)
+        else {
+          if (args.length != inputs.size)
+            throw new RuntimeException("input args number not equals to abi")
+          var params: List[ContractParam] = List.empty
+          for (i <- inputs.indices) {
+            val param = new ContractParam
+            param.`type` = inputs(i).`type`
+            param.value = args(i)
+            params = params :+ param
+          }
+          ContractUtil.convertFunction(name, params, outs)
         }
-        return ContractUtil.convertFunction(name, params, outs)
-      }
-    }
-    null
+      })
+      .orNull
   }
 
   def parseAbi(abi: String): List[ABI] = {
