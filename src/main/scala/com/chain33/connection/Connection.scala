@@ -1,6 +1,5 @@
 package com.chain33.connection
 
-import link.luyu.protocol.common.STATUS
 import link.luyu.protocol.link
 import cn.chain33.javasdk.client._
 import com.chain33.constant.Constant._
@@ -65,9 +64,9 @@ class Connection(val url: String) extends link.Connection {
 
   private def call(obj: Object, callback: link.Connection.Callback, data: () => Array[Byte]): Unit = {
     if (obj == null) {
-      callback.onResponse(Result.ERROR, "Error", null)
+      callback.onResponse(Result.ERROR, Msg.ERROR, null)
     } else {
-      callback.onResponse(STATUS.OK, "Success", data())
+      callback.onResponse(Result.SUCCESS, Msg.SUCCESS, data())
     }
   }
 

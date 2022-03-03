@@ -13,8 +13,14 @@ object Constant {
   }
 
   object Result {
-    val SUCCESS    = 0
-    val ERROR: Int = -1
+    val SUCCESS = 0
+    val ERROR   = -1
+  }
+
+  object Msg {
+    val SUCCESS = "success"
+    val Failure = "failure"
+    val ERROR   = "error"
   }
 
   object Event {

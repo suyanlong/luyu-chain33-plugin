@@ -43,7 +43,7 @@ case class Driver(connection: Connection) extends BaseDriver {
     resource.setType(getType)
     resource.setMethods(Array.empty)
     resources.add(resource)
-    callback.onResponse(STATUS.OK, "Success", resources.toArray(new Array[Resource](resources.size)))
+    callback.onResponse(STATUS.OK, Msg.SUCCESS, resources.toArray(new Array[Resource](resources.size)))
   }
 
   override def getBlockByHash(blockHash: String, callback: BaseDriver.BlockCallback): Unit = {
@@ -55,7 +55,7 @@ case class Driver(connection: Connection) extends BaseDriver {
         if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
           val blk = Utils.toObject(block).asInstanceOf[InternalBlock]
-          callback.onResponse(code, "Success", blk.toBlock)
+          callback.onResponse(code, Msg.SUCCESS, blk.toBlock)
         }
       }
     )
@@ -85,7 +85,7 @@ case class Driver(connection: Connection) extends BaseDriver {
         if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
           val blk = Utils.toObject(block).asInstanceOf[InternalBlock]
-          callback.onResponse(code, "Success", blk.toBlock)
+          callback.onResponse(code, Msg.SUCCESS, blk.toBlock)
         }
       }
     )
@@ -104,11 +104,11 @@ case class Driver(connection: Connection) extends BaseDriver {
           val receipt            = new Receipt
           receipt.setResult(Array[String](new String(r))) // TODO
           receipt.setBlockNumber(transactionReceipt.getHeight)
-          receipt.setCode(0) // SUCCESS
-          receipt.setMessage("Success")
+          receipt.setCode(Result.SUCCESS) // SUCCESS
+          receipt.setMessage(Msg.SUCCESS)
           receipt.setTransactionBytes(transactionReceipt.getTx.getRawpayload.getBytes()) // TODO
           receipt.setTransactionHash(txHash)
-          callback.onResponse(code, "Success", receipt)
+          callback.onResponse(code, Msg.SUCCESS, receipt)
         }
       }
     )
@@ -184,11 +184,11 @@ case class Driver(connection: Connection) extends BaseDriver {
                     receipt.setMethod(transaction.getMethod)
                     receipt.setArgs(transaction.getArgs)
                     receipt.setPath(transaction.getPath)
-                    receipt.setCode(0) // SUCCESS
-                    receipt.setMessage("Success")
+                    receipt.setCode(Result.SUCCESS) // SUCCESS
+                    receipt.setMessage(Msg.SUCCESS)
                     receipt.setTransactionBytes(r.getTx.getRawpayload.getBytes)
                     receipt.setTransactionHash(txHash.toString)
-                    callback.onResponse(code, "Success", receipt)
+                    callback.onResponse(code, Msg.SUCCESS, receipt)
                   }
                 }
               )
@@ -238,12 +238,12 @@ case class Driver(connection: Connection) extends BaseDriver {
                   val resp = new String(fun)
                   if (!(resp == "0x")) callResponse.setResult(funAbi.decodeOutput(resp))
                 }
-                callResponse.setCode(0) // original receipt status
-                callResponse.setMessage("Success")
+                callResponse.setCode(Result.SUCCESS) // original receipt status
+                callResponse.setMessage(Msg.SUCCESS)
                 callResponse.setMethod(callRequest.getMethod)
                 callResponse.setArgs(callRequest.getArgs)
                 callResponse.setPath(callRequest.getPath)
-                callback.onResponse(code, "Success", callResponse)
+                callback.onResponse(code, Msg.SUCCESS, callResponse)
               }
             }
           )
