@@ -60,6 +60,9 @@ lazy val root = (project in file("."))
       "com.typesafe.akka" %% "akka-stream" % AkkaVersion,
       "com.typesafe.akka" %% "akka-http" % AkkaHttpVersion,
 
+      "org.typelevel" %% "paiges-core" % "0.4.2",
+      "com.lihaoyi" %% "pprint" % "0.7.0",
+
       "link.luyu" % "luyu-cross-chain-protocol" % "1.0.0",
       "link.luyu" % "luyu-java-sdk" % "1.0.0",
       "link.luyu" % "luyu-toolkit" % "1.0.0",
