@@ -101,14 +101,15 @@ case class Driver(connection: Connection) extends BaseDriver {
         else {
           Driver.objectMapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
           val transactionReceipt = Driver.objectMapper.readValue(r, classOf[QueryTransactionResult]) // TODO
-          val receipt            = new Receipt
-          receipt.setResult(Array[String](new String(r))) // TODO
-          receipt.setBlockNumber(transactionReceipt.getHeight)
-          receipt.setCode(Result.SUCCESS) // SUCCESS
-          receipt.setMessage(Msg.SUCCESS)
-          receipt.setTransactionBytes(transactionReceipt.getTx.getRawpayload.getBytes()) // TODO
-          receipt.setTransactionHash(txHash)
-          callback.onResponse(code, Msg.SUCCESS, receipt)
+          val builder            = new ReceiptBuilder
+          builder
+            .setResult(Array[String](new String(r))) // TODO
+            .setBlockNumber(transactionReceipt.getHeight)
+            .setCode(Result.SUCCESS) // SUCCESS
+            .setMessage(Msg.SUCCESS)
+            .setTransactionBytes(transactionReceipt.getTx.getRawpayload.getBytes()) // TODO
+            .setTransactionHash(txHash)
+          callback.onResponse(code, Msg.SUCCESS, builder.builder())
         }
       }
     )
@@ -179,16 +180,17 @@ case class Driver(connection: Connection) extends BaseDriver {
                   if (code != STATUS.OK) callback.onResponse(code, msg, null)
                   else {
                     val r       = Utils.toObject(receiptRaw).asInstanceOf[QueryTransactionResult]
-                    val receipt = new Receipt
-                    receipt.setBlockNumber(r.getHeight)
-                    receipt.setMethod(transaction.getMethod)
-                    receipt.setArgs(transaction.getArgs)
-                    receipt.setPath(transaction.getPath)
-                    receipt.setCode(Result.SUCCESS) // SUCCESS
-                    receipt.setMessage(Msg.SUCCESS)
-                    receipt.setTransactionBytes(r.getTx.getRawpayload.getBytes)
-                    receipt.setTransactionHash(txHash.toString)
-                    callback.onResponse(code, Msg.SUCCESS, receipt)
+                    val builder = new ReceiptBuilder
+                    builder
+                      .setBlockNumber(r.getHeight)
+                      .setMethod(transaction.getMethod)
+                      .setArgs(transaction.getArgs)
+                      .setPath(transaction.getPath)
+                      .setCode(Result.SUCCESS)
+                      .setMessage(Msg.SUCCESS)
+                      .setTransactionBytes(r.getTx.getRawpayload.getBytes)
+                      .setTransactionHash(txHash.toString)
+                    callback.onResponse(code, Msg.SUCCESS, builder.builder())
                   }
                 }
               )
@@ -262,5 +264,57 @@ object Driver {
       baos.write(params(i))
     }
     baos.toByteArray
+  }
+}
+
+class ReceiptBuilder {
+  private val receipt = new Receipt
+
+  def setResult(result: Array[String]): ReceiptBuilder = {
+    receipt.setResult(result)
+    this
+  }
+
+  def setCode(code: Int): ReceiptBuilder = {
+    receipt.setCode(code)
+    this
+  }
+
+  def setMessage(message: String): ReceiptBuilder = {
+    receipt.setMessage(message)
+    this
+  }
+
+  def setPath(path: String): ReceiptBuilder = {
+    receipt.setPath(path)
+    this
+  }
+
+  def setMethod(method: String): ReceiptBuilder = {
+    receipt.setMethod(method)
+    this
+  }
+
+  def setArgs(args: Array[String]): ReceiptBuilder = {
+    receipt.setArgs(args)
+    this
+  }
+
+  def setTransactionHash(transactionHash: String): ReceiptBuilder = {
+    receipt.setTransactionHash(transactionHash)
+    this
+  }
+
+  def setTransactionBytes(transactionBytes: Array[Byte]): ReceiptBuilder = {
+    receipt.setTransactionBytes(transactionBytes)
+    this
+  }
+
+  def setBlockNumber(blockNumber: Long): ReceiptBuilder = {
+    receipt.setBlockNumber(blockNumber)
+    this
+  }
+  def builder(): Receipt = {
+    receipt
   }
 }
