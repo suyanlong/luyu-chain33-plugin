@@ -9,8 +9,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 
 import java.nio.charset.StandardCharsets
 
-class Connection(val url: String) extends link.Connection {
-  private val client = new RpcClient(url)
+sealed case class Connection(properties: Map[String, AnyRef]) extends link.Connection {
+  private val url        = properties.get("chainUrl").toString
+  private val encryption = properties.get("encryption").toString
+  private val client     = new RpcClient(url)
   client.setUrl(url)
 
   override def start(): Unit = {}

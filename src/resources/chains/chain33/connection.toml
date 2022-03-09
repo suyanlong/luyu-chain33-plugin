@@ -1,3 +1,22 @@
 [common]
 chainUrl = "http://127.0.0.1:8801"
 encryption = "SM2"
+
+
+[[luyu-resources]]
+zone = "pay"
+chain = "chain33"
+contract-sender = "0x0000000000000000000000000000000000000000" #合约地址
+code = "" #
+abi = ""  #
+name = "hello"
+methods = ["set(1)", "get(0)"]
+
+[[luyu-resources]]
+zone = "pay"
+chain = "chain33"
+contract-sender = "0x0000000000000000000000000000000000000001" #合约地址
+code = "" #
+abi = ""  #
+name = "test"
+methods = ["set(1)", "get(0)"]

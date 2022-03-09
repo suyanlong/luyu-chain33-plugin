@@ -4,7 +4,6 @@ import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.{CompletableFuture, TimeUnit}
-import java.util
 import com.google.protobuf.ByteString
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import link.luyu.protocol.algorithm.ecdsa.secp256k1.SignatureData
@@ -24,7 +23,9 @@ import cn.chain33.javasdk.model.rpcresult.QueryTransactionResult
 import cn.chain33.javasdk.model.protobuf.TransactionAllProtobuf.Signature
 import cn.chain33.javasdk.model.protobuf.{EvmService, TransactionAllProtobuf}
 
-case class Driver(connection: Connection) extends BaseDriver {
+sealed case class Driver(connection: Connection, properties: Map[String, AnyRef]) extends BaseDriver {
+  private val cs = Contracts.toContracts(properties)
+
   override def start(): Unit = {}
 
   override def stop(): Unit = {}
@@ -35,16 +36,8 @@ case class Driver(connection: Connection) extends BaseDriver {
 
   override def getSignatureType: String = "SM2_WITH_SM3"
 
-  override def listResources(callback: BaseDriver.ResourcesCallback): Unit = {
-    // TODO: mock
-    val resources: util.Collection[Resource] = new util.HashSet[Resource]
-    val resource: Resource                   = new Resource
-    resource.setPath("payment.chain33.0x98ab1ed8d9b9d928b5ebab99a4132363d6880b12")
-    resource.setType(getType)
-    resource.setMethods(Array.empty)
-    resources.add(resource)
-    callback.onResponse(STATUS.OK, Msg.SUCCESS, resources.toArray(new Array[Resource](resources.size)))
-  }
+  override def listResources(callback: BaseDriver.ResourcesCallback): Unit =
+    callback.onResponse(STATUS.OK, Msg.SUCCESS, cs.toArray.map(e => e.toResource))
 
   override def getBlockByHash(blockHash: String, callback: BaseDriver.BlockCallback): Unit = {
     connection.asyncSend(
@@ -232,14 +225,12 @@ case class Driver(connection: Connection) extends BaseDriver {
             callRequest.getPath, // TODO
             Type.CALL_TRANSACTION,
             data,
-            (code, msg, fun) => {
+            (code, msg, callData) => {
               if (code != STATUS.OK) callback.onResponse(code, msg, null)
               else {
+                val resp         = new String(callData)
                 val callResponse = new CallResponse
-                if (fun != null) {
-                  val resp = new String(fun)
-                  if (!(resp == "0x")) callResponse.setResult(funAbi.decodeOutput(resp))
-                }
+                if (!(resp == "0x")) callResponse.setResult(funAbi.decodeOutput(resp))
                 callResponse.setCode(Result.SUCCESS) // original receipt status
                 callResponse.setMessage(Msg.SUCCESS)
                 callResponse.setMethod(callRequest.getMethod)
@@ -314,6 +305,7 @@ class ReceiptBuilder {
     receipt.setBlockNumber(blockNumber)
     this
   }
+
   def builder(): Receipt = {
     receipt
   }
