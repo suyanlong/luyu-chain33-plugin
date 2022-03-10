@@ -1,3 +1,10 @@
-[common]
-chainUrl = "http://127.0.0.1:8801"
-encryption = "SM2"
+[chain33]
+version = 1  # blockchain version
+chainId = 1  # blockchain id
+
+[protocol]
+version = "1.0.0" #luyu protocol version
+
+
+
+

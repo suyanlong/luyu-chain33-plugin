@@ -1,5 +1,4 @@
 [common]
 name = 'chain33'
 type = 'chain33'
-version = 1
-chainId = 1
+

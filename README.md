@@ -54,6 +54,8 @@ make assembly
 
 ```
 
+## [开发指南](./doc/develop.md)
+
 ## Q&A
 正在开发中
 
