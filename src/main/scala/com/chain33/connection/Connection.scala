@@ -15,6 +15,60 @@ sealed case class Connection(properties: Map[String, AnyRef]) extends link.Conne
   private val client     = new RpcClient(url)
   client.setUrl(url)
 
+  val matchMap = Map {
+    Type.SEND_TRANSACTION -> { (data: Array[Byte], callback: link.Connection.Callback) =>
+      {
+        // TODO
+        val tx = client.submitTransaction(new String(data))
+        call(tx, callback, () => tx.getBytes)
+      }
+    }
+    Type.CALL_TRANSACTION -> { (data: Array[Byte], callback: link.Connection.Callback) =>
+      {
+        val contractCall = Connection.OBJECT_MAPPER.readValue(data, classOf[ContractCall])
+        // TODO
+        val jsonResult = client.callEVMAbi(contractCall.sender, contractCall.data)
+        call(jsonResult, callback, () => jsonResult.toString.getBytes)
+      }
+    }
+
+    Type.GET_TRANSACTION_RECEIPT -> { (data: Array[Byte], callback: link.Connection.Callback) =>
+      {
+        val receipt = client.queryTransaction(data.toString) // TODO
+        call(receipt, callback, () => Utils.toByteArray(receipt))
+      }
+    }
+    Type.GET_ABI -> { (data: Array[Byte], callback: link.Connection.Callback) =>
+      {
+        val abi = client.queryEVMABIInfo(data.toString, "storage") // TODO
+        call(abi, callback, () => abi.toString.getBytes(StandardCharsets.UTF_8))
+      }
+    }
+
+    Type.GET_BLOCK_NUMBER -> { (data: Array[Byte], callback: link.Connection.Callback) =>
+      {
+        val header = client.getLastHeader
+        call(header, callback, () => Utils.longToBytes(header.getHeight))
+      }
+    }
+
+    Type.GET_BLOCK_BY_HASH -> { (data: Array[Byte], callback: link.Connection.Callback) =>
+      {
+        val appBlock = client.getBlockByHashes(Array { data.toString }, true)
+        call(appBlock, callback, () => Utils.toByteArray(new InternalBlock(appBlock.get(0))))
+      }
+    }
+
+    Type.GET_BLOCK_BY_NUMBER -> { (data: Array[Byte], callback: link.Connection.Callback) =>
+      {
+        val blockNumber = Utils.bytesToLong(data)
+        val blk         = client.getBlocks(blockNumber, blockNumber, true)
+        call(blk, callback, () => Utils.toByteArray(new InternalBlock(blk.get(0).getBlock)))
+      }
+    }
+
+  }
+
   override def start(): Unit = {}
 
   override def stop(): Unit = {}
@@ -25,44 +79,10 @@ sealed case class Connection(properties: Map[String, AnyRef]) extends link.Conne
       `type`: Int,
       data: Array[Byte],
       callback: link.Connection.Callback
-  ): Unit = {
-    `type` match {
-      case Type.SEND_TRANSACTION =>
-        // TODO
-        val tx = client.submitTransaction(new String(data))
-        call(tx, callback, () => tx.getBytes)
-
-      case Type.CALL_TRANSACTION =>
-        val contractCall = Connection.OBJECT_MAPPER.readValue(data, classOf[ContractCall])
-        // TODO
-        val jsonResult = client.callEVMAbi(contractCall.sender, contractCall.data)
-        call(jsonResult, callback, () => jsonResult.toString.getBytes)
-
-      case Type.GET_TRANSACTION_RECEIPT =>
-        val receipt = client.queryTransaction(data.toString) // TODO
-        call(receipt, callback, () => Utils.toByteArray(receipt))
-      case Type.GET_ABI =>
-        val abi = client.queryEVMABIInfo(path, "storage") // TODO
-        call(abi, callback, () => abi.toString.getBytes(StandardCharsets.UTF_8))
-
-      case Type.GET_BLOCK_NUMBER =>
-        val header = client.getLastHeader
-        call(header, callback, () => Utils.longToBytes(header.getHeight))
-
-      case Type.GET_BLOCK_BY_HASH =>
-        val blockHash = data.toString
-        val appBlock  = client.getBlockByHashes(Array { blockHash }, true)
-        call(appBlock, callback, () => Utils.toByteArray(new InternalBlock(appBlock.get(0))))
-
-      case Type.GET_BLOCK_BY_NUMBER =>
-        val blockNumber = Utils.bytesToLong(data)
-        val blk         = client.getBlocks(blockNumber, blockNumber, true)
-        call(blk, callback, () => Utils.toByteArray(new InternalBlock(blk.get(0).getBlock)))
-
-      case _ => callback.onResponse(Result.ERROR, "Unrecognized type of " + `type`, null)
-
-    }
-  }
+  ): Unit = matchMap.getOrElse(
+    `type`,
+    (_: Array[Byte], callback: link.Connection.Callback) => callback.onResponse(Result.ERROR, "Unrecognized type of " + `type`, null)
+  )(data, callback)
 
   private def call(obj: Object, callback: link.Connection.Callback, data: () => Array[Byte]): Unit = {
     if (obj == null) {

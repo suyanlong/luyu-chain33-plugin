@@ -115,9 +115,9 @@ sealed case class Driver(connection: Connection, properties: Map[String, AnyRef]
   ): Unit = {
     val contract = Utils.getResourceName(transaction.getPath)
     connection.asyncSend(
-      contract,
+      "",
       Type.GET_ABI,
-      null,
+      contract.getBytes,
       (code, msg, abiRaw) => {
         if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
@@ -203,9 +203,9 @@ sealed case class Driver(connection: Connection, properties: Map[String, AnyRef]
     val address  = contract // TODO???
 
     connection.asyncSend(
-      address, // TODO???
+      "",
       Type.GET_ABI,
-      null,
+      address.getBytes, // TODO???
       (code, msg, abiRaw) => {
         if (code != STATUS.OK) callback.onResponse(code, msg, null)
         else {
